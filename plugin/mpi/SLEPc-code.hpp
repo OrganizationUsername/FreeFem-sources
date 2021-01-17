@@ -224,7 +224,7 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                 if(std::is_same<SType, EPS>::value)
                     EPSSetOperators(eps, ptA->_petsc, c == 0 && ptB ? ptB->_petsc : NULL);
                 else if(std::is_same<SType, SVD>::value)
-                    SVDSetOperator(svd, ptA->_petsc);
+                    SVDSetOperators(svd, ptA->_petsc, NULL);
                 else if(std::is_same<SType, PEP>::value) {
                     Mat* tab = new Mat[ptTab->N()];
                     for(int i = 0; i < ptTab->N(); ++i)
@@ -247,7 +247,7 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                     if(std::is_same<SType, EPS>::value)
                         EPSSetOperators(eps, S, NULL);
                     else if(std::is_same<SType, SVD>::value)
-                        SVDSetOperator(svd, S);
+                        SVDSetOperators(svd, S, NULL);
                 }
                 else {
                     Type* ptB = GetAny<Type*>((*B)(stack));

@@ -1024,6 +1024,8 @@ if test "$with_petsc" != no; then
                         AC_FF_PETSC_WHERELIB(tetgen,TETGEN_LIB,TETGEN_INCLUDE,$ffconfpetsc)
                         AC_FF_PETSC_WHERELIB(hpddm,HPDDM_LIB,HPDDM_INCLUDE,$ffconfpetsc)
                         AC_FF_PETSC_WHERELIB(superlu,SUPERLU_LIB,SUPERLU_INCLUDE,$ffconfpetsc)
+                        AC_FF_PETSC_WHERELIB(mmg,MMG_LIB,MMG_INCLUDE,$ffconfpetsc)
+                        AC_FF_PETSC_WHERELIB(parmmg,PARMMG_LIB,PARMMG_INCLUDE,$ffconfpetsc)
 		        AC_FF_PETSC_WHERELIB(scalapack,SCALAPACK_LIB,SCALAPACK_INCLUDE,$ffconfpetsc)
   		        AC_FF_PETSC_WHERELIB(suitesparse,SUITESPARSE_LIB,SUITESPARSE_INCLUDE,$ffconfpetsc,$ff_METIS_LIB)
  dnl               if test -n "$ff_SUITESPARSE_LIB" -a -n "$ff_METIS_LIB"; then
@@ -1114,6 +1116,8 @@ if test "$with_petsc_complex" != no; then
             AC_FF_PETSC_WHERELIB(tetgen,TETGEN_LIB,TETGEN_INCLUDE,$ffconfpetscc)
             AC_FF_PETSC_WHERELIB(hpddm,HPDDM_LIB,HPDDM_INCLUDE,$ffconfpetscc)
             AC_FF_PETSC_WHERELIB(superlu,SUPERLU_LIB,SUPERLU_INCLUDE,$ffconfpetscc)
+            AC_FF_PETSC_WHERELIB(mmg,MMG_LIB,MMG_INCLUDE,$ffconfpetscc)
+            AC_FF_PETSC_WHERELIB(parmmg,PARMMG_LIB,PARMMG_INCLUDE,$ffconfpetscc)
             AC_FF_PETSC_WHERELIB(scalapack,SCALAPACK_LIB,SCALAPACK_INCLUDE,$ffconfpetscc)
             AC_FF_PETSC_WHERELIB(suitesparse,SUITESPARSE_LIB,SUITESPARSE_INCLUDE,$ffconfpetscc)
             if test -z "$ff_BLASLAPACK_LIB"; then
