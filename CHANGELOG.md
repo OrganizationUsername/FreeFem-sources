@@ -35,6 +35,11 @@ All notable changes to this project will be documented in this file.
 -
 
 ### Fixed
+    - fixed the size of block sparse matrix : the size zero matrix (expression  0) could be a positive number,
+    but the size of null Z,  ( `matrix Z(0,0);`) coubd be no negative :
+     matrix Z(0,0); matrix A = [[Z,1],[Z,1]];// A is 2x1 matrix : the size of first column is zero.
+     matrix B = [[0,1],[0,1]]; // B is 2x2 matrix
+
     - bug in mat_interpolation of set of point with inside=true flag ( wrong set ) in 2d,3d, surface.
     - pass LDFLAGS=@LDFLAGS@ to petsc  configure
     - correct wrong assert in ClosePoints.cpp  (k<9) => (k<=9)
