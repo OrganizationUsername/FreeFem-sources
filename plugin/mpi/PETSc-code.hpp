@@ -3596,7 +3596,7 @@ namespace PETSc {
       Expression nargs[n_name_param];
       E_LinearSolver(const basicAC_F0& args, int d) : A(0), x(0), y(0), codeA(0), codeC(0), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
-        if (c != 2) {
+        if (c != 2 && c != 6) {
           if (c == 1) {
             const Polymorphic* op = dynamic_cast< const Polymorphic* >(args[0].LeftValue( ));
             ffassert(op);
@@ -3651,13 +3651,17 @@ namespace PETSc {
       : OneOperator(atype< long >( ), atype< Type* >( ), atype< KN< PetscScalar >* >( ),
                     atype< KN< PetscScalar >* >( )),
         c(5) {}
+    LinearSolver(int, int, int, int, int, int)
+      : OneOperator(atype< long >( ), atype< Type* >( ), atype< KNM< PetscScalar >* >( ),
+                    atype< KNM< PetscScalar >* >( )),
+        c(6) {}
   };
   template< class Type >
   basicAC_F0::name_and_type LinearSolver< Type >::E_LinearSolver::name_param[] = {
     {"precon", &typeid(Polymorphic*)}, {"sparams", &typeid(std::string*)}};
   template< class Type >
   AnyType LinearSolver< Type >::E_LinearSolver::operator( )(Stack stack) const {
-    if (c != 2) {
+    if (c != 2 && c != 6) {
       KN< PetscScalar >* in, *out;
       if (c != 4) {
         in = GetAny< KN< PetscScalar >* >((*x)(stack));
@@ -3802,7 +3806,8 @@ namespace PETSc {
           Mat B, C;
           MatCreateDense(PetscObjectComm((PetscObject)ptA->_ksp), in->N( ), PETSC_DECIDE, M, in->M(), &in->operator( )(0, 0), &B);
           MatCreateDense(PetscObjectComm((PetscObject)ptA->_ksp), out->N( ), PETSC_DECIDE, M, out->M(), &out->operator( )(0, 0), &C);
-          KSPMatSolve(ptA->_ksp, B, C);
+          if (c == 2) KSPMatSolve(ptA->_ksp, B, C);
+          else KSPMatSolveTranspose(ptA->_ksp, B, C);
           MatDestroy(&C);
           MatDestroy(&B);
         }
@@ -5492,6 +5497,7 @@ namespace PETSc {
       Global.Add("KSPSolveHermitianTranspose", "(", new PETSc::LinearSolver< Dmat >(1, 1, 1));
     Global.Add("KSPSolve", "(", new PETSc::LinearSolver< Dmat >(1, 1, 1, 1));
     Global.Add("KSPSolveTranspose", "(", new PETSc::LinearSolver< Dmat >(1, 1, 1, 1, 1));
+    Global.Add("KSPSolveTranspose", "(", new PETSc::LinearSolver< Dmat >(1, 1, 1, 1, 1, 1));
     Global.Add("KSPGetConvergedReason", "(", new OneOperator1_< long, Dmat* >(PETSc::GetConvergedReason< Dmat >));
     Global.Add("KSPGetIterationNumber", "(", new OneOperator1_< long, Dmat* >(PETSc::GetIterationNumber< Dmat >));
     Global.Add("KSPSetResidualHistory", "(", new OneOperator2_< long, Dmat*, KN< double >* >(PETSc::SetResidualHistory< Dmat >));
