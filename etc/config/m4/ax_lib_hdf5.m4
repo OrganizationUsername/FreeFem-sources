@@ -236,7 +236,7 @@ HDF5 support is being disabled (equivalent to --with-hdf5=no).
               ;;
           esac
         done
-
+         test  "${HDF5_LIBS#*"-lhdf5"}" == "$HDF5_LIBS" && HDF5_LIBS="-lhdf5 $HDF5_LIBS"
  #       HDF5_LIBS="-lhdf5 $HDF5_LIBS"
  #   remove double -lhdf5
         AC_MSG_RESULT([yes (version $[HDF5_VERSION])])
