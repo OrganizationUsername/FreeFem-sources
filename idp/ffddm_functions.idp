@@ -279,7 +279,7 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
             ENDIFMACRO
             IFMACRO(!pr#CSwithpetsc)
             if (pr#ncoarsespace > pr#sg)
-              mpiGatherv(tmp,vaux,processor(0,preffe#prmesh#mpicomm),pr#sizelgworld,pr#offsetiworld);
+              mpiGatherv(tmp,vaux(0:pr#ncoarsespace-pr#sg-1),processor(0,preffe#prmesh#mpicomm),pr#sizelgworld,pr#offsetiworld);
             /* mpiGatherv puts together inside vaux the local vectors (whose sizes are in sizelg) */
             for (int ii=0; ii < pr#sg; ii++)
               vaux[pr#ncoarsespace-pr#sg+ii] = pr#prfe#scalprod(pr#Z[ii+pr#si], l);
@@ -295,7 +295,7 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
               preffe#prmesh#toccomm(pr#tcsi,"",pr#tcs,preffe#prmesh#commCS)
             }
             if (pr#ncoarsespace > pr#sg)
-              mpiScatterv(zaux,tmp,processor(0,preffe#prmesh#mpicomm),pr#sizelgworld,pr#offsetiworld);
+              mpiScatterv(zaux(0:pr#ncoarsespace-pr#sg-1),tmp,processor(0,preffe#prmesh#mpicomm),pr#sizelgworld,pr#offsetiworld);
 
             if (pr#sg > 0) {
               if (mpiRank(preffe#prmesh#mpicomm) == 0)
