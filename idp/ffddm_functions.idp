@@ -641,7 +641,9 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
 {	
   if (preffe#prmesh#isincomm) {
     preffe#prmesh#tic(pr#tgmresi)
-    
+
+    string prefix = Stringification(pr)+"_";
+
     preffe#K[int] uni(x0.n);
     
     int dim = min(maxit,ffddmrestart);
@@ -659,7 +661,6 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
     IFMACRO(pr#withhpddm)
     uni = x0;
     real[int] timings(1);
-    string prefix = Stringification(pr)+"_";
     set(pr#hpddmOP, sparams = "-hpddm_"+prefix+"schwarz_method "+pr#prec+" -hpddm_"+prefix+"tol "+eps+" -hpddm_"+prefix+"variant "+(preffe#prmesh#binexactCS ? "flexible" : sprec)+" -hpddm_"+prefix+"gmres_restart "+dim+" -hpddm_"+prefix+"max_it "+maxit+" -hpddm_"+prefix+"verbosity "+pr#verbosity+" -hpddm_"+prefix+"orthogonalization mgs", prefix=prefix);
     if (pr#corr == "AD")
       set(pr#hpddmOP, sparams = "-hpddm_"+prefix+"schwarz_coarse_correction additive", prefix=prefix);
@@ -686,7 +687,31 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
     uni = pr#petscOP^-1*rhs;
     ENDIFMACRO
 
-    IFMACRO((!pr#withhpddm)&(!pr#withhpddmkrylov)&(!pr#withpetsc))
+    IFMACRO(pr#withpetscksp)
+    preffe#K[int] lff(x0.n), resff(x0.n), respetsc(pr#petscOP.n);
+    func preffe#K[int] pr#petscA(preffe#K[int] &l){
+      ChangeNumbering(pr#petscOP, lff, l, inverse=true, exchange=true); /* petsc -> ffddm numbering */
+      resff = pr#A(lff);
+      ChangeNumbering(pr#petscOP, resff, respetsc); /* ffddm -> petsc numbering */
+      return respetsc;
+    }
+
+    func preffe#K[int] pr#petscPREC(preffe#K[int] &l){
+      ChangeNumbering(pr#petscOP, lff, l, inverse=true, exchange=true); /* petsc -> ffddm numbering */
+      resff = pr#PREC(lff);
+      ChangeNumbering(pr#petscOP, resff, respetsc); /* ffddm -> petsc numbering */
+      return respetsc;
+    }
+
+    Mat<preffe#K> tmpmat(pr#petscOP, pr#petscA);
+    pr#petsckspOP = tmpmat;
+    set(pr#petsckspOP, precon=pr#petscPREC, sparams = "-prefix_push "+prefix+" -ksp_rtol "+eps+" -ksp_pc_side "+sprec+ " -ksp_gmres_restart "+dim+" -ksp_max_it "+maxit+ (pr#verbosity >= 3 ? " -ksp_monitor_true_residual":"") + " -prefix_pop",prefix = prefix);
+
+    uni = x0;
+    uni = pr#petsckspOP^-1*rhs;
+    ENDIFMACRO
+
+    IFMACRO((!pr#withhpddm)&(!pr#withhpddmkrylov)&(!pr#withpetsc)&(!pr#withpetscksp))
     preffe#K[int,int] Hn(dim+2,dim+1);     /* Hessenberg matrix */
     Hn = 0.;
 

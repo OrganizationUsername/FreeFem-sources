@@ -227,7 +227,7 @@ matrix<preffe#K> pr#matN;
 matrix<preffe#K> pr#matdirect;
 pr#matdirect.resize(1,1);
 
-IFMACRO((pr#withhpddm)|(pr#withpetsc))
+IFMACRO((pr#withhpddm)|(pr#withpetsc)|(pr#withpetscksp))
 if (!bpara){
 	if (mpiRank(preffe#prmesh#mpicomm) == 0)
 		cout << "["+Stringification(pr)+"] Error: HPDDM/PETSc is to be used only in parallel mode" << endl;
@@ -263,7 +263,7 @@ if (preffe#prmesh#inexactCSsplit == 1)
   set(pr#hpddmOP,sparams="-hpddm_"+Stringification(pr)+"_reuse_preconditioner 1", prefix=Stringification(pr)+"_");
 ENDIFMACRO
 
-IFMACRO((pr#withpetsc)|(pr#CSwithpetsc))
+IFMACRO((pr#withpetsc)|(pr#withpetscksp)|(pr#CSwithpetsc))
 IFMACRO(preffe#K,real)
 load "PETSc"
 ENDIFMACRO
@@ -272,7 +272,7 @@ load "PETSc-complex"
 ENDIFMACRO
 ENDIFMACRO
 
-IFMACRO(pr#withpetsc)
+IFMACRO((pr#withpetsc)|(pr#withpetscksp))
 pr#aRd[mpiRank(preffe#prmesh#commddm)].resize(preffe#Dk[mpiRank(preffe#prmesh#commddm)].n, preffe#Dk[mpiRank(preffe#prmesh#commddm)].n);
 IFMACRO(preffe#K,real)
 real[int] pr#petscDk = preffe#Dk[mpiRank(preffe#prmesh#commddm)];
@@ -281,6 +281,10 @@ IFMACRO(preffe#K,complex)
 real[int] pr#petscDk = preffe#Dk[mpiRank(preffe#prmesh#commddm)].re;
 ENDIFMACRO
 Mat<preffe#K> pr#petscOP(pr#aRd[mpiRank(preffe#prmesh#commddm)], pr#intersectionhpddm, pr#petscDk, communicator = preffe#prmesh#commddm);
+ENDIFMACRO
+
+IFMACRO(pr#withpetscksp)
+Mat<preffe#K> pr#petsckspOP(pr#petscOP);
 ENDIFMACRO
 
 IFMACRO(pr#CSwithpetsc)
