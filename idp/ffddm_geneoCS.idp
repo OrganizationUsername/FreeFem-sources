@@ -7,6 +7,8 @@ if (!pr#prfe#prmesh#excluded) {
   pr#Z[pr#Z.n-1].resize(u.n);
   pr#Z[pr#Z.n-1] = u;
 }
+else
+  pr#Z[pr#Z.n-1].resize(pr#prfe#Vhi.ndof);
 pr#sg++;
 }
 // EOM
@@ -121,10 +123,11 @@ else {
   ;
   ENDIFMACRO
 
-  if (!pr#prfe#prmesh#excluded)
+  if (!pr#prfe#prmesh#excluded && pr#si > 0)
     AiZmi.resize(pr#prfegeneo#Dk[mpiRank(pr#prfegeneo#prmesh#commddm)].n,pr#si);
-  int ni = pr#prfe#prmesh#excluded ? 0 : pr#prfegeneo#Dk[mpiRank(pr#prfegeneo#prmesh#commddm)].n;
-  AZmg.resize(ni,pr#sg);
+  int ni = pr#prfe#prmesh#excluded ? pr#prfe#Vhi.ndof : pr#prfegeneo#Dk[mpiRank(pr#prfegeneo#prmesh#commddm)].n;
+  if (pr#sg > 0)
+    AZmg.resize(ni,pr#sg);
   
   for (int ii=0; ii < pr#si; ii++) {
     IFMACRO(pr#localmacrominoverlap,1)
