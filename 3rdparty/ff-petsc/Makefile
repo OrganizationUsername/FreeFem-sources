@@ -35,7 +35,11 @@ DARWIN=$(shell uname | grep Darwin 2> /dev/null)
 
 W_SUDO:=$(SHELL mkdir -p "$(DESTDIR)$(FF_prefix_petsc)" && test -w "$(DESTDIR)$(FF_prefix_petsc) || echo sudo)
 ifeq ($(COMPILE_OPENBLAS),openblas)
+ifeq ($(FC),)
 PETSC_OPENBLAS := --download-f2cblaslapack
+else
+PETSC_OPENBLAS := --download-openblas
+endif
 PETSC_OPENBLAS_C := --with-blaslapack-dir=$(DIR_INSTALL_REAL)
 else
 PETSC_OPENBLAS = --with-blaslapack-include='$(shell echo $(BLASINC) | sed "s/-I//g")' \
