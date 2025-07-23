@@ -168,6 +168,14 @@ if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#comm
 
 pr#prfe#prmesh#toc(pr#tloc,"local eigenvalue problems",pr#teigenv)
 
+/* pr#sizelg stores the number of ev for every subdomain */
+if (!bpara)
+  pr#sizelg = sizel;
+else {
+  pr#sizelg = 0;
+  mpiAllReduce(sizel,pr#sizelg,pr#prfe#prmesh#mpicomm,mpiSUM);
+}
+
 ffddmbuildZTAZ(pr,pr,null)
 
 ENDIFMACRO

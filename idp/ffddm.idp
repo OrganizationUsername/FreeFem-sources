@@ -378,15 +378,12 @@ if (preffe#prmesh#isincomm)
     {
       if (preffe#prmesh#overlap > 0) {
 
-        IFMACRO(!pr#myOperator)
-        Varf(vPb, preffe#prmesh#AugThi, preffe#AugVhi)
-        ENDIFMACRO
-
         if (!pr#isrect) {
           IFMACRO(pr#myOperator)
           pr#myOperator(pr#aRd[i], preffe#prmesh#AugThi, preffe#AugVhi)
           ENDIFMACRO
           IFMACRO(!pr#myOperator)
+          Varf(vPb, preffe#prmesh#AugThi, preffe#AugVhi)
           if (preffe#prmesh#inexactCSsplit > 1)
             pr#aRd[i] = vPb(preffe#AugVhi, preffe#AugVhi,sym=vsym,tgv=vtgvelim,solver=GMRES);
           else
@@ -395,7 +392,14 @@ if (preffe#prmesh#isincomm)
           renumbering(pr#aRd[i], preffe#Auginterp, eps=-1);
         }
         else {
-          ;
+          NewMacro localmacroaug2 preffe2#prmesh#buildAug EndMacro
+          IFMACRO(localmacroaug2,1)
+          preffe2#prmesh#AugThi = preffe2#prmesh#AugaTh[i];
+          ENDIFMACRO
+          IFMACRO(localmacroaug2,0)
+          preffe2#prmesh#meshN preffe2#prmesh#AugThi = preffe2#prmesh#Thi + preffe2#prmesh#aThborder[i];
+          ENDIFMACRO
+
           IFMACRO(!pr#myOperator)
           matrix<preffe#K> Auginterp2;
           fespace AugVhi2(preffe2#prmesh#AugThi, preffe2#fPk);
@@ -408,6 +412,7 @@ if (preffe#prmesh#isincomm)
           Auginterp2.resize(preffe2#Vhi.ndof, AugVhi2.ndof);
           matrix<preffe#K> Auginterp1 = preffe#Auginterp;
 
+          Varf(vPb, preffe2#prmesh#AugThi, preffe2#AugVhi)
           pr#aRd[i] = vPb(preffe#AugVhi, AugVhi2,sym=0,tgv=vtgv,solver=GMRES);
 
           matrix<preffe#K> tmp = pr#aRd[i]*Auginterp1';
