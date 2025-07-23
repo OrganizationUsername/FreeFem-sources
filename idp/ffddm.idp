@@ -365,12 +365,15 @@ if (preffe#prmesh#isincomm)
   	IFMACRO(localmacroaug,0)
     preffe#prmesh#meshN preffe#prmesh#AugThi = preffe#prmesh#Thi + preffe#prmesh#aThborder[i]; /* local mesh augmented of one layer to define local Dirichlet matrices without the global matrix*/
     fespace preffe#AugVhi(preffe#prmesh#AugThi, preffe#fPk);
-    int[int] n2o = (0:preffe#prmesh#Thi.nt-1);
-    int[int] renum = restrict(preffe#Vhi, preffe#AugVhi,n2o);
-    int[int] Ic = (0:preffe#Vhi.ndof-1);
-    real[int] Kc(preffe#Vhi.ndof);
-    Kc = 1;
-    matrix preffe#Auginterp = [Ic,renum,Kc];
+    matrix preffe#Auginterp;
+    if (preffe#prmesh#Thi.nt > 0) {
+      int[int] n2o = (0:preffe#prmesh#Thi.nt-1);
+      int[int] renum = restrict(preffe#Vhi, preffe#AugVhi,n2o);
+      int[int] Ic = (0:preffe#Vhi.ndof-1);
+      real[int] Kc(preffe#Vhi.ndof);
+      Kc = 1;
+      preffe#Auginterp = [Ic,renum,Kc];
+    }
     preffe#Auginterp.resize(preffe#Vhi.ndof, preffe#AugVhi.ndof);
     ENDIFMACRO
 
@@ -403,12 +406,14 @@ if (preffe#prmesh#isincomm)
           IFMACRO(!pr#myOperator)
           matrix<preffe#K> Auginterp2;
           fespace AugVhi2(preffe2#prmesh#AugThi, preffe2#fPk);
-          int[int] n2o = (0:preffe2#prmesh#Thi.nt-1);
-          int[int] renum = restrict(preffe2#Vhi, AugVhi2,n2o);
-          int[int] Ic = (0:preffe2#Vhi.ndof-1);
-          preffe#K[int] Kc(preffe2#Vhi.ndof);
-          Kc = 1;
-          Auginterp2 = [Ic,renum,Kc];
+          if (preffe2#prmesh#Thi.nt > 0) {
+            int[int] n2o = (0:preffe2#prmesh#Thi.nt-1);
+            int[int] renum = restrict(preffe2#Vhi, AugVhi2,n2o);
+            int[int] Ic = (0:preffe2#Vhi.ndof-1);
+            preffe#K[int] Kc(preffe2#Vhi.ndof);
+            Kc = 1;
+            Auginterp2 = [Ic,renum,Kc];
+          }
           Auginterp2.resize(preffe2#Vhi.ndof, AugVhi2.ndof);
           matrix<preffe#K> Auginterp1 = preffe#Auginterp;
 

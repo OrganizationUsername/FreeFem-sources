@@ -92,24 +92,26 @@ if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#comm
     return res;
   }
 
-  NewMacro localmacroK pr#prfe#K EndMacro
-  IFMACRO(localmacroK,real)
-  int kk = EigenValue(pr#prfe#Dk[i].n, A1=fgeneoA1, B=ffullgeneoB, mode=3, sym=1, tol=1e-1,sigma=0,value=ev,rawvector=eV,ncv=max(20,2*nev));
-  ENDIFMACRO
-  IFMACRO(localmacroK,complex)
-  int kk = complexEigenValue(pr#prfe#Dk[i].n, A1=fgeneoA1, B=ffullgeneoB, mode=3, tol=1e-3,sigma=0,value=ev,rawvector=eV,ncv=max(20,3*nev));
-  ENDIFMACRO
-
   int nok = 0;
 
-  for(int j=0;j<nev;++j) {
-    if (j == 0 || ffddmtau == 0 || real(ev[j]) < ffddmtau) {
-      /*if (mpirank == 0) cout <<  i << " " << pr#si << " " << ev[j] << endl;*/
-      pr#Z[pr#si].resize(pr#prfe#Dk[i].n);
-      pr#Z[pr#si] = pr#prfe#Dk[i].*eV(:,j);
-      if (pr#Z[pr#si].sum < 0) pr#Z[pr#si] *= -1;
-      pr#si+=1;
-      nok+=1;
+  if (pr#prfe#Dk[i].n > 0) {
+    NewMacro localmacroK pr#prfe#K EndMacro
+    IFMACRO(localmacroK,real)
+    int kk = EigenValue(pr#prfe#Dk[i].n, A1=fgeneoA1, B=ffullgeneoB, mode=3, sym=1, tol=1e-1,sigma=0,value=ev,rawvector=eV,ncv=max(20,2*nev));
+    ENDIFMACRO
+    IFMACRO(localmacroK,complex)
+    int kk = complexEigenValue(pr#prfe#Dk[i].n, A1=fgeneoA1, B=ffullgeneoB, mode=3, tol=1e-3,sigma=0,value=ev,rawvector=eV,ncv=max(20,3*nev));
+    ENDIFMACRO
+
+    for(int j=0;j<nev;++j) {
+      if (j == 0 || ffddmtau == 0 || real(ev[j]) < ffddmtau) {
+        /*if (mpirank == 0) cout <<  i << " " << pr#si << " " << ev[j] << endl;*/
+        pr#Z[pr#si].resize(pr#prfe#Dk[i].n);
+        pr#Z[pr#si] = pr#prfe#Dk[i].*eV(:,j);
+        if (pr#Z[pr#si].sum < 0) pr#Z[pr#si] *= -1;
+        pr#si+=1;
+        nok+=1;
+      }
     }
   }
 
@@ -358,7 +360,7 @@ if (!prA#prfe#prmesh#excluded) {
   SP#Btildei = prBtilde#aRd[mpiRank(prA#prfe#prmesh#commddm)]*prA#prfe#Auginterp'; /* Btilde_i of eq. (9) */
 
   matrix mC = -Ctildei;
-  SP#localBlocki = [[prA#aR[mpiRank(prA#prfe#prmesh#commddm)],0],[SP#Btildei,mC]];
+  SP#localBlocki = [[prA#aR[mpiRank(prA#prfe#prmesh#commddm)],SP#Btildei'],[SP#Btildei,mC]];
   set(SP#localBlocki,solver=sparsesolver,sym=1,factorize=3,commworld=mpiCommSelf);
 }
 prA#prfe#prmesh#Augtoc(SP#tfactoi,"",SP#tfacto)

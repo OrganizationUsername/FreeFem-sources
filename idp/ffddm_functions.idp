@@ -499,8 +499,10 @@ func preffe#K[int] pr#PREC1(preffe#K[int] &l)
   int mrhs = 1;
   if (preffe#prmesh#isincomm && !preffe#prmesh#excluded) {
     int ndof = bpara ? preffe#Dk[mpiRank(preffe#prmesh#commddm)].n : preffe#Vhglob.ndof;
-    assert(l.n%ndof == 0);
-    mrhs = l.n/ndof;
+    if (l.n > 0) {
+      assert(l.n%ndof == 0);
+      mrhs = l.n/ndof;
+    }
   }
   return pr#PREC1(l, mrhs);
 }
