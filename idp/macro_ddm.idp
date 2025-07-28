@@ -148,9 +148,7 @@ IFMACRO(!privateCreateMat)
             n2o.resize(0);
         else
             neighbors = trunc(globalName, suppSmooth > 0.001 && suppSmooth < 0.999, new2old = n2o);
-        int[int] partOverlap(n2o.n);
-        for[i, value : n2o] partOverlap[i] = part[][value];
-        Unique(partOverlap, intersection[0], remove = constant);
+        Unique(part[], intersection[0], remove = constant);
         if(s > 1 && level <= 1) {
             globalName = trunc(globalName, suppSmooth > 0.001, split = s);
             supp = abs(part - constant) < 0.1;
@@ -1164,20 +1162,21 @@ IFMACRO(!privateDmesh#CartesianPartitioning)
         if(userPartitioning.n != PhGlobalPrivate.ndof || labPeriodic.n > 0) {
             timerPartition = mpiWtime();
             meshN ThGlobalPeriodic;
+            int[int] n2oPeriodic;
             if(labPeriodic.n > 0) {
                 VhGlobalPrivate marker;
-                for(int i = 0; i < labPeriodic.n; ++i) {
-                    varf vMarker(uPrivate, vPrivate) = on(labPeriodic[i], uPrivate = 1.0);
-                    marker[] += vMarker(0, VhGlobalPrivate, tgv = -1);
-                }
+                varf vMarker(uPrivate, vPrivate) = on(labPeriodic, uPrivate = 1.0);
+                marker[] = vMarker(0, VhGlobalPrivate, tgv = -1);
                 PhGlobalPrivate partPeriodic = marker > 0.1;
                 while(1) {
                     AddLayers(ThGlobal, partPeriodic[], 1 + overlap, marker[]);
                     partPeriodic = marker > 0.001;
-                    ThGlobalPeriodic = trunc(ThGlobal, partPeriodic < 0.999);
-                    if(ThGlobal.nt / real(ThGlobalPeriodic.nt) > mpisize / real(mpisize - 1))
+                    ThGlobalPeriodic = trunc(ThGlobal, partPeriodic < 0.999, new2old = n2oPeriodic);
+                    if(ThGlobal.nt / real(ThGlobalPeriodic.nt) > mpiSize(comm) / real(mpiSize(comm) - 1))
                         break;
                 }
+                if(mpiRank(comm) == 0 && verbosity > 0)
+                    cout.scientific << " --- part of the global mesh with periodic BC has " << ThGlobal.nt - ThGlobalPeriodic.nt << " elements, rest of the global mesh has " << ThGlobalPeriodic.nt << " elements" << endl;
             }
             if(mpiRank(comm) == 0) {
                 if(verbosity > 0)
@@ -1191,7 +1190,7 @@ IFMACRO(!privateDmesh#CartesianPartitioning)
                     }
                     else
                         partPeriodic[] = 1.0;
-                    partGlobal = partPeriodic;
+                    partGlobal[](n2oPeriodic) = partPeriodic[];
                 }
                 else {
                     partitionerSeq(partGlobal[], ThGlobal, mpiSize(comm));
@@ -1206,7 +1205,7 @@ IFMACRO(!privateDmesh#CartesianPartitioning)
                 }
                 else
                     partPeriodic[] = 1.0;
-                partGlobal = partPeriodic;
+                partGlobal[](n2oPeriodic) = partPeriodic[];
             }
             else
                 partitionerPar(partGlobal[], ThGlobal, comm, mpiSize(comm));
