@@ -3847,6 +3847,7 @@ namespace PETSc {
         nargs[2] && c != 1 ? GetAny< Matrice_Creuse< double >* >((*nargs[2])(stack)) : nullptr;
       PetscInt bs;
       MatGetBlockSize(ptB->_petsc, &bs);
+      KN< double >* empty = nullptr;
       if (!pList) {
         ptA->_A = new HpddmType(static_cast< const HPDDM::Subdomain< PetscScalar >& >(*ptB->_A));
         ptA->_A->setMatrix(dA);
@@ -3858,14 +3859,14 @@ namespace PETSc {
             ptA->_D = new KN<PetscReal>(dA->HPDDM_n);
             for (int i = 0; i < dA->HPDDM_n; ++i) ptA->_D->operator[](i) = ptB->_A->getScaling()[i];
         }
+        empty = new KN< double >(dA->HPDDM_n, (double*)(ptA->_D));
         initPETScStructure<D>(ptA, bs,
           nargs[1] && GetAny< bool >((*nargs[1])(stack)) ? PETSC_TRUE : PETSC_FALSE,
-          ptA->_D);
+          empty);
       } else {
         int n = ptB->_A->getDof();
         ffassert(dA->HPDDM_n == n);
         HPDDM::MatrixCSR< void >* L;
-        KN< double >* empty = nullptr;
         if (pList->A) {
           MatriceMorse< double >* mList = static_cast< MatriceMorse< double >* >(&*(pList->A));
           mList->CSR( );
@@ -3896,10 +3897,10 @@ namespace PETSc {
         ptA->_num = new PetscInt[ptA->_A->getDof()];
         initPETScStructure<D>(ptA, bs,
           nargs[1] && GetAny< bool >((*nargs[1])(stack)) ? PETSC_TRUE : PETSC_FALSE, empty);
-        delete empty;
         if (c != 0 || !ptK->A)
             delete dA;
       }
+      delete empty;
       if (c == 1) {
         MatSetType(ptA->_petsc, MATSHELL);
         User< LinearSolver< Dmat > > user = nullptr;
