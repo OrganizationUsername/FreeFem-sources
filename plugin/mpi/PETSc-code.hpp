@@ -1066,6 +1066,7 @@ namespace PETSc {
             PetscBool assembled;
             MatAssembled(ptB->_petsc, &assembled);
             MatDuplicate(ptB->_petsc, assembled ? MAT_COPY_VALUES : MAT_DO_NOT_COPY_VALUES, &ptA->_petsc);
+            MatShellSetOperation(ptB->_petsc, MATOP_DESTROY, NULL);
             MatDestroy(&ptB->_petsc);
           }
         } else
