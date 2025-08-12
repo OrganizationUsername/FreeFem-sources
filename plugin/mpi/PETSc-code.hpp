@@ -3858,11 +3858,19 @@ namespace PETSc {
         if (ptB->_A->getScaling()) {
             ptA->_D = new KN<PetscReal>(dA->HPDDM_n);
             for (int i = 0; i < dA->HPDDM_n; ++i) ptA->_D->operator[](i) = ptB->_A->getScaling()[i];
+#if !defined(PETSC_USE_REAL_DOUBLE)
+            empty = new KN<double>(dA->HPDDM_n);
+            for (int i = 0; i < dA->HPDDM_n; ++i) empty->operator[](i) = ptB->_A->getScaling()[i];
+#else
+            empty = ptA->_D;
+#endif
         }
-        empty = new KN< double >(dA->HPDDM_n, (double*)(ptA->_D));
         initPETScStructure<D>(ptA, bs,
           nargs[1] && GetAny< bool >((*nargs[1])(stack)) ? PETSC_TRUE : PETSC_FALSE,
           empty);
+#if defined(PETSC_USE_REAL_DOUBLE)
+        empty = nullptr;
+#endif
       } else {
         int n = ptB->_A->getDof();
         ffassert(dA->HPDDM_n == n);
