@@ -3946,7 +3946,7 @@ namespace PETSc {
     DistributedCSR< HpddmType >* ptC = GetAny< DistributedCSR< HpddmType >* >((*C)(stack));
     Matrice_Creuse< upscaled_type<PetscScalar> >* ptK =
       (c == 0 || c == 3 ? GetAny< Matrice_Creuse< upscaled_type<PetscScalar> >* >((*K)(stack)) : nullptr);
-    if (ptB->_A && ptC->_A) {
+    if (ptB->_petsc && ptC->_petsc) {
       ptA->_first = ptB->_first;
       ptA->_last = ptB->_last;
       ptA->_cfirst = ptC->_first;
@@ -3963,7 +3963,7 @@ namespace PETSc {
         PetscInt* ja = nullptr;
         PetscScalar* a = nullptr;
         bool free = true;
-        if (ptK->A) {
+        if (ptK && ptK->A) {
           MatriceMorse< upscaled_type<PetscScalar> >* mA = static_cast< MatriceMorse< upscaled_type<PetscScalar> >* >(&(*ptK->A));
           ff_HPDDM_MatrixCSR< PetscScalar > dA(mA);
           ptA->_num = new PetscInt[mA->n + (ptC->_A && ptC->_A->getMatrix() ? ptC->_A->getMatrix()->HPDDM_m : mA->m)];
@@ -4013,24 +4013,33 @@ namespace PETSc {
           MatShellSetOperation(ptA->_petsc, MATOP_DESTROY, (void (*)(void))ShellDestroy< LinearSolver< Dmat >  >);
         }
         MatSetUp(ptA->_petsc);
-        MatSetOption(ptA->_petsc, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE);
-        if(ptB->_A->getMatrix() && ptC->_A->getMatrix()) {
-          ptA->_num = new PetscInt[ptB->_A->getMatrix( )->HPDDM_n + ptC->_A->getMatrix( )->HPDDM_m];
-          ptA->_cnum = ptA->_num + ptB->_A->getMatrix( )->HPDDM_n;
-          std::copy_n(ptB->_num, ptB->_A->getMatrix( )->HPDDM_n, ptA->_num);
-          std::copy_n(ptC->_num, ptC->_A->getMatrix( )->HPDDM_m, ptA->_cnum);
+        if(ptB->_A && ptC->_A) {
+          MatSetOption(ptA->_petsc, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE);
+          if(ptB->_A->getMatrix() && ptC->_A->getMatrix()) {
+            ptA->_num = new PetscInt[ptB->_A->getMatrix( )->HPDDM_n + ptC->_A->getMatrix( )->HPDDM_m];
+            ptA->_cnum = ptA->_num + ptB->_A->getMatrix( )->HPDDM_n;
+            std::copy_n(ptB->_num, ptB->_A->getMatrix( )->HPDDM_n, ptA->_num);
+            std::copy_n(ptC->_num, ptC->_A->getMatrix( )->HPDDM_m, ptA->_cnum);
+          } else {
+            ptA->_num = new PetscInt[ptB->_A->getDof() + ptC->_A->getDof()];
+            ptA->_cnum = ptA->_num + ptB->_A->getDof();
+            std::copy_n(ptB->_num, ptB->_A->getDof(), ptA->_num);
+            std::copy_n(ptC->_num, ptC->_A->getDof(), ptA->_cnum);
+          }
         } else {
-          ptA->_num = new PetscInt[ptB->_A->getDof() + ptC->_A->getDof()];
-          ptA->_cnum = ptA->_num + ptB->_A->getDof();
-          std::copy_n(ptB->_num, ptB->_A->getDof(), ptA->_num);
-          std::copy_n(ptC->_num, ptC->_A->getDof(), ptA->_cnum);
+          ptA->_num = new PetscInt[ptB->_last - ptB->_first + ptC->_last - ptC->_first];
+          ptA->_cnum = ptA->_num + ptB->_last - ptB->_first;
+          std::copy_n(ptB->_num, ptB->_last - ptB->_first, ptA->_num);
+          std::copy_n(ptC->_num, ptC->_last - ptC->_first, ptA->_cnum);
         }
       }
-      ptA->_exchange = new HPDDM::template Subdomain< PetscScalar >*[2];
-      ptA->_exchange[0] = new HPDDM::template Subdomain< PetscScalar >(*ptB->_A);
-      ptA->_exchange[0]->setBuffer( );
-      ptA->_exchange[1] = new HPDDM::template Subdomain< PetscScalar >(*ptC->_A);
-      ptA->_exchange[1]->setBuffer( );
+      if(ptB->_A && ptC->_A) {
+        ptA->_exchange = new HPDDM::template Subdomain< PetscScalar >*[2];
+        ptA->_exchange[0] = new HPDDM::template Subdomain< PetscScalar >(*ptB->_A);
+        ptA->_exchange[0]->setBuffer( );
+        ptA->_exchange[1] = new HPDDM::template Subdomain< PetscScalar >(*ptC->_A);
+        ptA->_exchange[1]->setBuffer( );
+      } else ptA->_exchange = nullptr;
     }
     if (c == 0 && nargs[0] && GetAny< bool >((*nargs[0])(stack))) ptK->destroy( );
     if (c != 3)
