@@ -595,6 +595,17 @@ public:
     E_F0 * code(const basicAC_F0 & args) const {
 	  return new TransE_Array(dynamic_cast<const E_Array*>((Expression) args[0])); }
 };
+class opUnary : public OneOperator{
+public:
+    const char * op;
+    AnyType operator()(Stack s)  const {ffassert(0);return 0L;}
+    bool MeshIndependent() const { return false;}
+    
+    opUnary(const char * oop,aType A): OneOperator(atype<C_F0>(),A), op(oop) {}
+
+    E_F0 *  code(const basicAC_F0 & ) const {ffassert(0);}
+    C_F0  code2(const basicAC_F0 &args) const;
+};
 
 class opDot : public OneOperator{
 public:
@@ -1422,6 +1433,11 @@ void Init_map_type()
       TheOperators->Add("./",new opSum("/",atype<E_Array >(),atype<TransE_Array>() )   );  // a faire mais dur
     // correct in sept. 2009
       TheOperators->Add("./",new opSum("/",atype<TransE_Array >(),atype<TransE_Array>() )   );  // a faire mais dur
+    // Add sep 2025
+     TheOperators->Add("-",new opUnary("-",atype<E_Array >())   );
+     TheOperators->Add("-",new opUnary("-",atype<TransE_Array >())   );  
+     TheOperators->Add("+",new opUnary("+",atype<E_Array >())   );  //
+     TheOperators->Add("+",new opUnary("+",atype<TransE_Array >())   );
 
 
      // il faut refechir  .....  FH
@@ -1926,6 +1942,7 @@ C_F0  opDot::code2(const basicAC_F0 &args) const
     return C_F0();
 
 }
+
 C_F0  opColumn::code2(const basicAC_F0 &args) const
 {
     bool ta =args[0].left()==atype<TransE_Array>();
@@ -2045,11 +2062,72 @@ C_F0  opColumn::code2(const basicAC_F0 &args) const
     else ffassert(0);
     return C_F0();
 }
+C_F0  opUnary::code2(const basicAC_F0 &args) const
+{
+    bool ta =args[0].left()==atype<TransE_Array>();
+    const TransE_Array * tea=0;
+    const E_Array * ea=0;
+    if( ta)  tea = dynamic_cast<const TransE_Array*>((Expression) args[0]);
+    else ea = dynamic_cast<const E_Array*>((Expression) args[0]);
+    assert( ea || tea );
+    const E_Array & a=  ta ? *tea->v : *ea;
+    int na=a.size();
+    if(na <1 && nb < 1) CompileError(" empty array - [ ...]   ");
+    bool maa= a[0].left()==atype<E_Array>();
+    int ma =1;
 
+    if(maa) {
+        ma= a[0].LeftValue()->nbitem();
+        for (int i=1;i<na;i++)
+            if( ma != (int) a[i].LeftValue()->nbitem())
+                CompileError(" first matrix with variable number of columm");
+
+    }
+    int na1=na,ma1=ma;
+    if(ta) RNM::Exchange(na1,ma1);
+
+    KNM<CC_F0> A(na1,ma1) ;
+    if(maa)
+        for (int i=0;i<na;++i)
+        {
+            const E_Array * li=  dynamic_cast<const E_Array *>(a[i].LeftValue());
+            ffassert(li);
+            for (int j=0; j<ma;++j)
+                if(!ta)  A(i,j) = (*li)[j];
+                else     A(j,i) = TryConj((*li)[j]);
+        }
+    else
+        for (int i=0;i<na;++i)
+            if(!ta)  A(i,0) = a[i];
+            else     A(0,i) = TryConj(a[i]);
+
+ 
+    AC_F0  v;
+    v = 0; // empty
+    if( ma1 == 1) // 1 vecteur
+    {
+        for (int i=0;i<na;++i)
+            v += C_F0(TheOperators,op,ta ? TryConj(a[i]) : a[i]) ;
+        return C_F0(TheOperators,"[]",v);
+    }
+    else {
+        // return formal matrix
+        AC_F0  w,v;
+        w=0;
+        for (int i=0;i<na1;++i)
+        {
+            v=0;
+            for (int j=0;j<ma1;++j)
+                v+= C_F0(TheOperators,op,A(i,j));
+            w+=C_F0(TheOperators,"[]",v);
+        }
+        return C_F0(TheOperators,"[]",w);
+    }
+}
 
 C_F0  opSum::code2(const basicAC_F0 &args) const
 {
-
+ 
     bool ta =args[0].left()==atype<TransE_Array>();
     bool tb = args[1].left()==atype<TransE_Array>();
     const TransE_Array * tea=0;
@@ -2137,7 +2215,7 @@ C_F0  opSum::code2(const basicAC_F0 &args) const
         {
             v=0;
             for (int j=0;j<ma1;++j)
-                v+= C_F0(TheOperators,"+",A(i,j),B(i,j));
+                v+= C_F0(TheOperators,op,A(i,j),B(i,j));// correction 3/9/25 FH thanks to O. Pantz
             w+=C_F0(TheOperators,"[]",v);
         }
         return C_F0(TheOperators,"[]",w);
