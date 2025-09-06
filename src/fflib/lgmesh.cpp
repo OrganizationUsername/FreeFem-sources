@@ -653,7 +653,7 @@ AnyType SaveMesh::operator()(Stack stack) const
     MeshPoint *mp(MeshPointStack(stack)) , mps=*mp;
      ofstream fp((*fn+".points").c_str());
      ofstream ff((*fn+".faces").c_str());
-     fp.precision(12);
+     fp.precision(17);
      if (verbosity>1)
        cout << "  -- Opening files " << (*fn+".points") << " and " << (*fn+".faces") << endl;
     const   Fem2D::Mesh & Th=*Thh;

@@ -142,7 +142,7 @@ namespace bamg {
       if(bin) mode |=ios_base::binary;
       if(verbosity>9) cout << "     mode = " << mode << " bin: " << ios_base::binary << " out: s" << ios_base::out << endl;
       ofstream f(filename,mode  /*,ios::trunc*/);
-    f.precision(12);
+    f.precision(17);
 
     if (f) switch (type) {
         case BDMesh: {
@@ -427,7 +427,7 @@ namespace bamg {
     assert(this && nbt);
     Int4 *reft = new Int4[nbt];
     Int4 nbInT = ConsRefTriangle(reft);
-    f.precision(12);
+    f.precision(17);
     f << nbv << " " << nbInT << endl;
     for (i = 0; i < nbt; i++)
       if (reft[i] >= 0) {
@@ -477,7 +477,7 @@ namespace bamg {
     assert(this && nbt);
     Int4 *reft = new Int4[nbt];
     Int4 nbInT = ConsRefTriangle(reft);
-    f.precision(12);
+    f.precision(17);
     Int4 nele = nbInT - NbOfQuad;
     Int4 ntri = nbInT - 2 * NbOfQuad;
     Int4 nqua = NbOfQuad;
@@ -512,7 +512,7 @@ namespace bamg {
     assert(this && nbt);
     Int4 *reft = new Int4[nbt];
     Int4 nbInT = ConsRefTriangle(reft);
-    f.precision(12);
+    f.precision(17);
     f << nbv << " " << nbInT << " " << nbe << endl;
 
     for (i = 0; i < nbv; i++)
@@ -580,7 +580,7 @@ namespace bamg {
     Int4 *reft = new Int4[nbt];
     Int4 nbInT = ConsRefTriangle(reft);
     f << nbv << " " << nbInT << endl;
-    cout.precision(12);
+    cout.precision(17);
     for (i = 0; i < nbv; i++)
       f << i + 1 << " " << vertices[i].r.x << " " << vertices[i].r.y << " " << vertices[i].ref( )
         << endl;
@@ -671,7 +671,7 @@ namespace bamg {
       }
     }
     {
-      f.precision(12);
+      f.precision(17);
       f << "\nVertices\n" << Th.nbv << endl;
       for (Int4 i = 0; i < Th.nbv; i++) {
         Vertex &v = Th.vertices[i];
@@ -836,7 +836,7 @@ namespace bamg {
     int nbreqv = 0;
     {
 
-      f.precision(12);
+      f.precision(17);
       f << "\nVertices\n" << Gh.nbv << endl;
       for (Int4 i = 0; i < Gh.nbv; i++) {
         GeometricalVertex &v = Gh.vertices[i];
