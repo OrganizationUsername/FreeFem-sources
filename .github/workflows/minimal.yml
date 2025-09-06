@@ -73,7 +73,7 @@ jobs:
 
       # Automake is necessary on MacOS since aclocal is not included in autoconf
       - name: Install
-        run: brew install gcc autoconf automake m4 git flex bison
+        run: brew install autoconf automake m4 flex bison
 
       - name: Symlink GCC & Fortran
         run: ./etc/actions/macos/link_fortran.sh "$(uname -p)"

@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@main
 
       - name: Install
-        run: brew install gcc m4 git flex bison suitesparse hdf5 cmake wget autoconf automake
+        run: brew install m4 flex bison suitesparse hdf5 wget autoconf automake
 
       - name: Symlink GCC & Fortran
         run: ./etc/actions/macos/link_fortran.sh "$(uname -p)"

@@ -115,7 +115,7 @@ jobs:
 
       - name: Install
         run: |
-          brew install m4 git bison hdf5 wget autoconf automake
+          brew install m4 bison hdf5 wget autoconf automake
           brew remove llvm@$LLVM_VERSION
 
       - name: Symlink gfortran

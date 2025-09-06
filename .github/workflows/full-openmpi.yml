@@ -1,5 +1,5 @@
-# Full version of FreeFem, using OpenMPI
-name: Full version OpenMPI
+# Full version of FreeFem, using Open MPI
+name: Full version Open MPI
 
 on:
   push:
