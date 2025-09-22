@@ -113,7 +113,7 @@ The following libraries are used
 
 ~~~freefem
 // NBPROC 8
-// PARAM -ns -wg -Kmax 9
+// PARAM -ns -wg
 load "bem"  // boundary element methods for electromagnetism (Htool)
 load "RadiativeTransfer_htool"  // contains the functions specific to this application program in C++
 load "qf11to25"  // needed for better quadrature rules of integrals
