@@ -5243,6 +5243,7 @@ basicAC_F0::name_and_type Op_trunc_meshS::Op::name_param[Op_trunc_meshS::Op::n_n
 MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMortar,
                  const int newbelabel, double precis_mesh, long orientation, bool cleanmesh, bool removeduplicate) {
   // computation of number of border elements and vertex without split
+    // warning the surf can be no manifold
   int nbe = 0;
   int nbei = 0;
   int nt = 0;
@@ -5275,8 +5276,10 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
     int iff;
     int it = Th.BoundaryElement(ibe, iff);    // it num of element and iff num of local boundary
     tagTonB[it] |= tagb[iff];
+    int nkb = Th.nElementonB(it, iff);//  manifold nkb ==2
+
     int ifff = iff, itt = Th.ElementAdj(it, ifff);
-    if (itt >= 0 && itt != it) {
+    if (nkb==2) {// internal
       tagTonB[itt] |= tagb[ifff];
     }
   }
@@ -5288,17 +5291,19 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
       nt = nt + kksplit2;
 
       // computation of number of border elements -- edge element boundary o internal
-      for (int j = 0; j < 3; j++) {
+      for (int j = 0; j < 3; j++) {// warninh if non manifol
+          // nElementonB
+        int nkb = Th.nElementonB(i, j); // not 2 => on boundary !!
         int jt = j, it = Th.ElementAdj(i, jt);
-        if ((it == i || it < 0) || !split[it]) {
+        if ( (nkb!=2)|| !split[it]) {
           nbeee++;    // boundary edge ...
-        } else {
+        } else if(nkb==2) {
           nbfi++;    // internal edge count 2 times ...
         }
 
-        if (it == i || it < 0) {
+        if (nkb!=2) {
           nbe += kksplit;    // on est sur la frontiere
-        } else if (!split[it]) {
+        } else if (!split[it]) {// un voisin !
           nbe += kksplit;    // le voisin ne doit pas etre decoupe
         } else if ((tagTonB[i] & tagb[j]) != 0 && i < it) {
           nbei++, nbe += kksplit;    // internal boundary ..
@@ -5311,7 +5316,7 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
     }
   }
 
-  ffassert(nbfi % 2 == 0);
+  ffassert(nbfi % 2 == 0);// Ok because   manifold edge is on boundary  !!!!
   // original mesh
   nface = nbeee + nbfi / 2;    // nbfi / 2; internal edge count 2 times
   // nbe and nbei trunc mesh
@@ -5480,10 +5485,11 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
 
       // here split internal edges
       for (int j = 0; j < 3; j++) {
+        int nkb = Th.nElementonB(i, j);//  manifold nkb ==2
         int jt = j, it = Th.ElementAdj(i, jt);
 
         int nedgesplit = kksplit;
-        if (((tagTonB[i] & tagb[j]) == 0) && !(it == i || it < 0) && !split[it]) {
+        if (((tagTonB[i] & tagb[j]) == 0) && (nkb==2) && !split[it]) {
           // new border not on boundary
           int ivb[2];
           for (int ii = 0; ii < nedgesplit; ii++) {
@@ -5520,17 +5526,27 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
   SplitSimplex< R1 >(kksplit, nv1Dsub, vertex1Dsub, nedge1Dsub, edge1Dsub);
 
   for (int ibe = 0; ibe < Th.nbe; ibe++) {
-    int iff;
+      int iff;
+    bool allnosplit=1;
     int it = Th.BoundaryElement(ibe, iff);
+    int nkb = Th.nElementonB(it, iff);//  manifold nkb ==2
     int ifff = iff, itt = Th.ElementAdj(it, ifff);
-    if (itt < 0) {
-      itt = it;
+    allnosplit =split[it] != 0;
+      int kk=1;
+      // loop on all triangles contening edge !!!
+    while (itt >0 && itt != it)
+    {
+        allnosplit =split[itt] != 0;
+        itt = Th.ElementAdj(itt, ifff);
+        kk++;
+       // cout << kk << " "<< nkb << "/ " << it << " " <<itt << endl;
+        ffassert(kk<=nkb);
     }
 
     if (split[it] == 0 && split[itt] == 0) {
       continue;    // boundary not on one element
     }
-
+    if( allnosplit)continue;
     const BoundaryEdgeS &K(Th.be(ibe));
     int ivv[2];
 
@@ -5568,8 +5584,10 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
       }
       bbedges[ie].set(vertices, ivb, K.lab);
       ie++;
-      assert(ie <= nbe);
+        if(ie >= nbe  ) cout << " Bug " << ie << " "<< nbe << endl;
+     
     }
+      ffassert(ie <= nbe);
     delete[] vertexedgesub;
     delete[] newindex;
   }

@@ -45,6 +45,7 @@ TESTS_OTHER = BlackScholes2D.md \
 	test1.edp \
 	thermal.md \
 	thermic.md \
+	thermal-contact-conductance-composite.md \
 	dist-projection.md
 
 TESTS_ARPARCK = sound.md

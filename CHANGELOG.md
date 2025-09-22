@@ -2,7 +2,8 @@
 <!--
 ## [Version number]
 ### Added
--
+
+- Add formal unary operator in formal array  ; -[1] is now [-1]  3/Sep/25
 
 ### Changed
 -
@@ -35,6 +36,9 @@ All notable changes to this project will be documented in this file.
 -
 
 ### Fixed
+    - trunc of surface mesh, a bug can occur in case on non manifold case (memory fault)
+       (Thanks to PHT) 22/Sep/25
+    - in formal operation in array  (ie [1]-[1] is not [0] but [2], same for "./" and ".*" operator  ) 3/Sep/25
     - fixed the size of block sparse matrix : the size zero matrix (expression  0) could be a positive number,
     but the size of null Z,  ( `matrix Z(0,0);`) coubd be no negative :
      matrix Z(0,0); matrix A = [[Z,1],[Z,1]];// A is 2x1 matrix : the size of first column is zero.
