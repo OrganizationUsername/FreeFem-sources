@@ -5240,373 +5240,371 @@ basicAC_F0::name_and_type Op_trunc_meshS::Op::name_param[Op_trunc_meshS::Op::n_n
   {"fregion", &typeid(long)}
 };
 
+inline SortArray< int, 2 > keyedge(const MeshS &Th,const TriangleS &K,int e)
+{
+    int e1 = Th(K[K.nvedge[e][0]]);
+    int e2 = Th(K[K.nvedge[e][1]]);
+    return SortArray< int, 2 >(e1,e2);
+}
+inline SortArray< int, 2 > keyedge(int e1,int e2)
+{
+    return SortArray< int, 2 >(e1,e2);
+}
+
 MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMortar,
-                 const int newbelabel, double precis_mesh, long orientation, bool cleanmesh, bool removeduplicate) {
-  // computation of number of border elements and vertex without split
+                 const int newbelabel, double precis_mesh, long orientation,
+                 bool cleanmesh, bool removeduplicate)
+{
+    // computation of number of border elements and vertex without split
     // warning the surf can be no manifold
-  int nbe = 0;
-  int nbei = 0;
-  int nt = 0;
-  int nv = 0;
-
-  int nvtrunc = 0;
-  int nedge = 0;
-  int nface = 0;
-
-  double hmin = 1e100;
-
-  R3 bmin, bmax;
-  // counter for edges, boundary or internal
-  int nbeee = 0;
-  int nbfi = 0;
-
-  const int kksplit2 = kksplit * kksplit;
-
-  int ntsplit = 0;
-  int tagb[3] = {1, 2, 4};
-
-  KN< int > tagTonB(Th.nt);
-  tagTonB = 0;
-
-  if (verbosity > 2)
-    cout << "initial mesh, nb vertices:  " << Th.nv << ", nb triangles: " << Th.nt
-         << ", nb boundary edges:" << Th.nbe << endl;
-
-  for (int ibe = 0; ibe < Th.nbe; ibe++) {
-    int iff;
-    int it = Th.BoundaryElement(ibe, iff);    // it num of element and iff num of local boundary
-    tagTonB[it] |= tagb[iff];
-    int nkb = Th.nElementonB(it, iff);//  manifold nkb ==2
-
-    int ifff = iff, itt = Th.ElementAdj(it, ifff);
-    if (nkb==2) {// internal
-      tagTonB[itt] |= tagb[ifff];
-    }
-  }
-
-  for (int i = 0; i < Th.nt; i++) {
-    if (split[i]) {
-      ++ntsplit;    // number of original triangle must be split
-      // number of triangles after trunc
-      nt = nt + kksplit2;
-
-      // computation of number of border elements -- edge element boundary o internal
-      for (int j = 0; j < 3; j++) {// warninh if non manifol
-          // nElementonB
-        int nkb = Th.nElementonB(i, j); // not 2 => on boundary !!
-        int jt = j, it = Th.ElementAdj(i, jt);
-        if ( (nkb!=2)|| !split[it]) {
-          nbeee++;    // boundary edge ...
-        } else if(nkb==2) {
-          nbfi++;    // internal edge count 2 times ...
-        }
-
-        if (nkb!=2) {
-          nbe += kksplit;    // on est sur la frontiere
-        } else if (!split[it]) {// un voisin !
-          nbe += kksplit;    // le voisin ne doit pas etre decoupe
-        } else if ((tagTonB[i] & tagb[j]) != 0 && i < it) {
-          nbei++, nbe += kksplit;    // internal boundary ..
-        }
-      }
-
-      for (int e = 0; e < 3; e++) {
-        hmin = min(hmin, Th[i].lenEdge(e));    // calcul de .lenEdge pour un Mesh3
-      }
-    }
-  }
-
-  ffassert(nbfi % 2 == 0);// Ok because   manifold edge is on boundary  !!!!
-  // original mesh
-  nface = nbeee + nbfi / 2;    // nbfi / 2; internal edge count 2 times
-  // nbe and nbei trunc mesh
-  double hseuil = (hmin / kksplit) / 1000.;
-  if (verbosity > 5)
-    cout << "Before trunc, mesh has " << nbeee << "  boundary edges, " << nbfi / 2
-         << " internal edges = "
-         << ",  all edges  =  " << nface << ", hseuil=" << hseuil << endl;
-
-  /* determination de bmin, bmax et hmin */
-
-  KN< int > takevertex(Th.nv, -1);
-
-  for (int i = 0; i < Th.nt; i++) {
-    if (split[i]) {
-      const TriangleS &K(Th.elements[i]);
-
-      for (int ii = 0; ii < 3; ii++) {
-        int iv = Th.operator( )(K[ii]);
-        if (takevertex[iv] == -1) {
-          bmin = Minc(Th.vertices[iv], bmin);
-          bmax = Maxc(Th.vertices[iv], bmax);
-          takevertex[iv] = nvtrunc++;
-        }
-      }
-    }
-  }
-
-  // take same numbering
-  for (int i = 0, k = 0; i < Th.nv; i++) {
-    if (takevertex[i] >= 0) {
-      takevertex[i] = k++;
-    }
-  }
-
-  if (kksplit > 1) {    // compute the number of slip edge ...
+    int nbe = 0;
+    int nbei = 0;// not used
+    int nt = 0;
+    int nv = 0;
+    
+    int nvtrunc = 0;
+    int nedge = 0;
+    int nface = 0;
+    
+    double hmin = 1e100;
+    
+    R3 bmin, bmax;
+    // counter for edges, boundary or internal
+    int nbeee = 0;
+    int nbfi = 0;
+    
+    const int kksplit2 = kksplit * kksplit;
+    //  construct of edge
     nedge = 0;
+    //  Attention FH  class not the stl
+    // new code sep. 24 , 2025
+    
+    //  build all edges
     HashTable< SortArray< int, 2 >, int > edges(3 * Th.nt, Th.nt);
-
-    for (int i = 0; i < Th.nt; i++) {
-      if (split[i]) {
-        const TriangleS &K(Th.elements[i]);
-
-        for (int e = 0; e < 3; ++e) {
-          int e1 = Th(K[Th[i].nvedge[e][0]]);
-          int e2 = Th(K[Th[i].nvedge[e][1]]);
-          SortArray< int, 2 > key(e1, e2);
-          if (!edges.find(key)) {
-            edges.add(key, nedge++);    /// liste de tous les edges du mesh initial
-          }
-        }
-      }
-    }
-  }
-
-  if (verbosity > 10) {
-    cout << "    -- nvertex  " << nvtrunc << ", nedges before trunc = " << nedge
-         << ", nfaces edges total in initial mesh= " << nface << " number splited ntri =" << ntsplit
-         << endl
-         << "    -- Euler/Poincare constante = " << nvtrunc - nedge + nface - ntsplit << endl;
-  }
-
-  /* determination des vertex, triangles et tetrahedre obtenue apres splitting dans le Simplex */
-
-  int nvmax = 0;
-  for (int i = 0; i < Th.nt; i++)
-    if (split[i]) {
-      int k = Abs(split[i]);
-      int r = (k + 2) * (k + 1) / 2;
-      split[i] < 0 ? nvmax += 3 *r - 3 : nvmax += r - 3;
-    }
-  nvmax += nvtrunc;
-
-  int nvsub = (kksplit + 1) * (kksplit + 2) / 2;
-  int ntrisub = kksplit2;
-  int nedgesub = 3 * (kksplit + 1) * (kksplit + 2) / 2 - 3 * (kksplit + 1);
-
-  R2 *vertexsub;
-  int *trisub;
-  int *edgesub;
-
-  // split triangles element - fct splid on a the simplex
-  SplitSimplex< R2 >(kksplit, nvsub, vertexsub, ntrisub, trisub);
-  // split the boundary of the triangle simplex
-  SplitEdgeSimplex(kksplit, nedgesub, edgesub);
-
-  int itt = 0;
-  int ie = 0;
-
-  Vertex3 *vertices = new Vertex3[nvmax];
-  TriangleS *t = new TriangleS[nt];
-  TriangleS *triangles = t;
-  BoundaryEdgeS *b = new BoundaryEdgeS[nbe];
-  BoundaryEdgeS *bbedges = b;
-  R3 hh = (bmax - bmin) / 10.;
-
-  EF23::GTree< Vertex3 > *gtree = new EF23::GTree< Vertex3 >(vertices, bmin - hh, bmax + hh, 0);
-
-  const R3 *pP[3];
-
-  int np = 0;    // nb of new points ..
-
-  // first build old point to keep the numbering order for DDM ...
-  for (int i = 0, k = 0; i < Th.nv; i++) {
-    if (takevertex[i] >= 0) {
-      Vertex3 *pvi = gtree->ToClose(Th(i), hseuil);
-      if (!pvi) {
-        (R3 &)vertices[np] = Th(i);
-        vertices[np].lab = Th(i).lab;
-        gtree->Add(vertices[np]);
-        np++;
-      } else {
-        ffassert(0);
-      }
-    }
-  }
-
-  KN< R3 > vertextrisub(nvsub);
-  KN< int > newindex(nvsub);
-
-  for (int i = 0; i < Th.nt; i++) {
-    if (split[i]) {
-      const TriangleS &K(Th.elements[i]);
-
-      for (int ii = 0; ii < 3; ii++) pP[ii] = &K[ii];
-      for (int iv = 0; iv < nvsub; iv++) (R3 &)vertextrisub[iv] = vertexsub[iv].Bary(pP);
-
-      // new points
-      for (int iv = 0; iv < nvsub; iv++) {
-        Vertex3 *pvi = gtree->ToClose(vertextrisub[iv], hseuil);
-
-        if (!pvi) {
-          vertices[np].x = vertextrisub[iv].x;
-          vertices[np].y = vertextrisub[iv].y;
-          vertices[np].z = vertextrisub[iv].z;
-          vertices[np].lab = K.lab;
-          newindex[iv] = np;
-          gtree->Add(vertices[np]);
-          np++;
-        } else {
-          // assert(pvi);
-          newindex[iv] = pvi - vertices;
-        }
-        ffassert(np <= nvmax);
-      }
-      nv = np;
-      // new triangles
-      for (int ii = 0; ii < ntrisub; ii++) {
-        int ivt[3];
-        for (int jj = 0; jj < 3; jj++) {
-          ivt[jj] = newindex[trisub[3 * ii + jj]];
-          assert(trisub[3 * ii + jj] < nvsub);
-          assert(ivt[jj] < np);
-        }
-        R3 A = vertices[ivt[0]];
-        R3 B = vertices[ivt[1]];
-        R3 C = vertices[ivt[2]];
-        R3 n = (B - A) ^ (C - A);
-        // to build the vectorial area
-        R a = (Area3(A, B, C), n);
-        if (a < 0) swap(ivt[1], ivt[2]);
-        triangles[itt].set(vertices, ivt, K.lab);
-        itt++;
-        assert(itt <= nt);
-      }
-
-      // here split internal edges
-      for (int j = 0; j < 3; j++) {
-        int nkb = Th.nElementonB(i, j);//  manifold nkb ==2
-        int jt = j, it = Th.ElementAdj(i, jt);
-
-        int nedgesplit = kksplit;
-        if (((tagTonB[i] & tagb[j]) == 0) && (nkb==2) && !split[it]) {
-          // new border not on boundary
-          int ivb[2];
-          for (int ii = 0; ii < nedgesplit; ii++) {
-            for (int jjj = 0; jjj < 2; jjj++) {
-              int iedge = 2 * j * nedgesplit + 2 * ii;
-              ivb[jjj] = newindex[edgesub[iedge + jjj]];    ///// ???
-              assert(edgesub[2 * ii + jjj] < nvsub);
-              assert(ivb[jjj] < np);
+    KN<int> nkie(3*Th.nt,-1);// number nkie(3*k+i)  of i  = 0,1,2 edge of triangle k ;
+ 
+    for (int i = 0; i < Th.nt; i++)
+        if (split[i]) {
+            nt+=kksplit2;
+            const TriangleS &K(Th.elements[i]);
+            
+            for (int e = 0; e < 3; ++e) {
+                hmin = min(hmin, Th[i].lenEdge(e));    // calcul de .lenEdge pour un Mesh3
+                SortArray< int, 2 > key=keyedge(Th,K,e);
+                auto it = edges.find(key);
+                int nue ;
+                if (!it)  edges.add(key, nue = nedge++);
+                else nue=it->v;/// liste de tous les edges du mesh initial decoupe
+                 nkie[3*i+e]= nue;
             }
-            bbedges[ie].set(vertices, ivb, newbelabel);
+        }
+    KN<int> nwe(nedge,0);
+  
+    int newedge=0;//  new border edge  beetwen split and remove
+    
+    // nwe(i) == 1 => new edge , nwe(i) = 2  => edge old boundary
+        
+    // find all new edge in old edges !!
+    int nbeb =0;
+    for (int ibe = 0; ibe < Th.nbe; ibe++) {
+        int e1 = Th(Th.be(ibe)[0]);
+        int e2 = Th(Th.be(ibe)[1]);
+        SortArray< int, 2 > key = keyedge(e1,e2);
+        auto it =edges.find(key);
+        if( it  ) // edge exist
+        {
+            int nue = it->v;
+            ++nbeb;
+            nwe[nue]=2;
+        }//
+    }
+    // search edge beetwen split and non remove
+    for (int i = 0; i < Th.nt; i++)
+        if (split[i]==0) {// for unsplited face
+            const TriangleS &K(Th.elements[i]);
+            
+            for (int e = 0; e < 3; ++e) {
+                SortArray< int, 2 > key=keyedge(Th,K,e);
+                auto it = edges.find(key);
+                if(it) { // beetwen split and non split
+                    int nue = it->v;
+                    if(!nwe[nue]) {
+                        ++newedge;
+                        nwe[nue]=1;}
+                }
+            }
+        }
+
+    int ntsplit = 0;
+    int tagb[3] = {1, 2, 4};
+    
+    KN< int > tagTonB(Th.nt), n;
+    tagTonB = 0;
+    
+    if (verbosity > 2)
+        cout << " -- trunc: initial mesh, nb vertices:  " << Th.nv << ", nb triangles: " << Th.nt
+        << ", nb boundary edges:" << Th.nbe << " split :"<< kksplit << endl
+        << "      all nbe  "<<  nedge  << " new edges  "
+        << newedge << " edge on border "<<  nbeb<< endl;
+    
+    
+    double hseuil = (hmin / kksplit) / 1000.;
+    nbe = (nbeb+newedge)*kksplit;
+    if (verbosity > 5)
+        cout << "  - Before trunc, mesh has " << Th.nbe << " new  boundary edges, " << nbeb
+        << " internal edges = "
+        << ",  all edges  =  " << nedge << ", hseuil=" << hseuil << " new nbe = " << nbe <<  endl;
+    
+   
+    /* determination de bmin, bmax et hmin */
+    
+    KN< int > takevertex(Th.nv, -1);
+    
+    for (int i = 0; i < Th.nt; i++) {
+        if (split[i]) {
+            const TriangleS &K(Th.elements[i]);
+            
+            for (int ii = 0; ii < 3; ii++) {
+                int iv = Th.operator( )(K[ii]);
+                if (takevertex[iv] == -1) {
+                    bmin = Minc(Th.vertices[iv], bmin);
+                    bmax = Maxc(Th.vertices[iv], bmax);
+                    takevertex[iv] = nvtrunc++;
+                }
+            }
+        }
+    }
+    
+    // take same numbering
+    for (int i = 0, k = 0; i < Th.nv; i++) {
+        if (takevertex[i] >= 0) {
+            takevertex[i] = k++;
+        }
+    }
+    
+    
+    
+    /* determination des vertex, triangles et tetrahedre obtenue apres splitting dans le Simplex */
+    
+    int nvmax = 0;
+    for (int i = 0; i < Th.nt; i++)
+        if (split[i]) {
+            int k = Abs(split[i]);
+            int r = (k + 2) * (k + 1) / 2;
+            split[i] < 0 ? nvmax += 3 *r - 3 : nvmax += r - 3;
+        }
+    nvmax += nvtrunc;
+    
+    int nvsub = (kksplit + 1) * (kksplit + 2) / 2;
+    int ntrisub = kksplit2;
+    int nedgesub = 3 * (kksplit + 1) * (kksplit + 2) / 2 - 3 * (kksplit + 1);
+    
+    R2 *vertexsub;
+    int *trisub;
+    int *edgesub;
+    
+    // split triangles element - fct splid on a the simplex
+    SplitSimplex< R2 >(kksplit, nvsub, vertexsub, ntrisub, trisub);
+    // split the boundary of the triangle simplex
+    SplitEdgeSimplex(kksplit, nedgesub, edgesub);
+    
+    int itt = 0;
+    int ie = 0;
+    
+    Vertex3 *vertices = new Vertex3[nvmax];
+    TriangleS *t = new TriangleS[nt];
+    TriangleS *triangles = t;
+    BoundaryEdgeS *b = new BoundaryEdgeS[nbe];
+    BoundaryEdgeS *bbedges = b;
+    R3 hh = (bmax - bmin) / 10.;
+    
+    EF23::GTree< Vertex3 > *gtree = new EF23::GTree< Vertex3 >(vertices, bmin - hh, bmax + hh, 0);
+    
+    const R3 *pP[3];
+    
+    int np = 0;    // nb of new points ..
+    
+    // first build old point to keep the numbering order for DDM ...
+    for (int i = 0, k = 0; i < Th.nv; i++) {
+        if (takevertex[i] >= 0) {
+            Vertex3 *pvi = gtree->ToClose(Th(i), hseuil);
+            if (!pvi) {
+                (R3 &)vertices[np] = Th(i);
+                vertices[np].lab = Th(i).lab;
+                gtree->Add(vertices[np]);
+                np++;
+            } else {
+                ffassert(0);
+            }
+        }
+    }
+    
+    KN< R3 > vertextrisub(nvsub);
+    KN< int > newindex(nvsub);
+    
+    for (int i = 0; i < Th.nt; i++)
+        if (split[i]) {
+            const TriangleS &K(Th.elements[i]);
+            
+            for (int ii = 0; ii < 3; ii++) pP[ii] = &K[ii];
+            for (int iv = 0; iv < nvsub; iv++) (R3 &)vertextrisub[iv] = vertexsub[iv].Bary(pP);
+            
+            // new points
+            for (int iv = 0; iv < nvsub; iv++) {
+                Vertex3 *pvi = gtree->ToClose(vertextrisub[iv], hseuil);
+                
+                if (!pvi) {
+                    vertices[np].x = vertextrisub[iv].x;
+                    vertices[np].y = vertextrisub[iv].y;
+                    vertices[np].z = vertextrisub[iv].z;
+                    vertices[np].lab = K.lab;
+                    newindex[iv] = np;
+                    gtree->Add(vertices[np]);
+                    np++;
+                } else {
+                    // assert(pvi);
+                    newindex[iv] = pvi - vertices;
+                }
+                ffassert(np <= nvmax);
+            }
+            nv = np;
+            // new triangles
+            for (int ii = 0; ii < ntrisub; ii++) {
+                int ivt[3];
+                for (int jj = 0; jj < 3; jj++) {
+                    ivt[jj] = newindex[trisub[3 * ii + jj]];
+                    assert(trisub[3 * ii + jj] < nvsub);
+                    assert(ivt[jj] < np);
+                }
+                R3 A = vertices[ivt[0]];
+                R3 B = vertices[ivt[1]];
+                R3 C = vertices[ivt[2]];
+                R3 n = (B - A) ^ (C - A);
+                // to build the vectorial area
+                R a = (Area3(A, B, C), n);
+                if (a < 0) swap(ivt[1], ivt[2]);
+                triangles[itt].set(vertices, ivt, K.lab);
+                itt++;
+                assert(itt <= nt);
+            }
+            
+            // here split  new edges not in boundary
+            for (int j = 0; j < 3; j++) {
+                int nedgesplit = 0;
+                if(verbosity>99)
+                      cout << " ** " <<i << " " << j << " " << nkie[3*i+j] << "  " << nwe[nkie[3*i+j]] << " " << ie <<  endl;
+                ffassert(nkie[3*i+j]>=0);
+                if( nwe[nkie[3*i+j]]==1) nedgesplit=kksplit;//
+                if(nedgesplit) {
+                    // new border not on boundary
+                    int ivb[2];
+                    for (int ii = 0; ii < nedgesplit; ii++) {
+                        for (int jjj = 0; jjj < 2; jjj++) {
+                            int iedge = 2 * j * nedgesplit + 2 * ii;
+                            ivb[jjj] = newindex[edgesub[iedge + jjj]];    ///// ???
+                            assert(edgesub[2 * ii + jjj] < nvsub);
+                            assert(ivb[jjj] < np);
+                        }
+                        bbedges[ie].set(vertices, ivb, newbelabel);
+                        ie++;
+                    }
+                }
+                assert(ie <= nbe);
+            }
+        }
+    
+    
+    if (verbosity > 4) cout << "    ++ np=" << np << "==  nv=" << nvmax << endl;
+    
+    ffassert(np <= nv);
+    if (verbosity > 4) cout << "   -- Number of new border face not on Border " << ie << endl;
+    
+    delete[] vertexsub;
+    delete[] trisub;
+    delete[] edgesub;
+    
+    // split border elements Edges
+    int nv1Dsub = kksplit + 1;
+    int nedge1Dsub = kksplit;
+    R1 *vertex1Dsub;
+    int *edge1Dsub;
+    
+    SplitSimplex< R1 >(kksplit, nv1Dsub, vertex1Dsub, nedge1Dsub, edge1Dsub);
+    if(verbosity>4) cout << " new nbe = "<< nbe << " old  " << Th.nbe << " ie " << ie << endl;
+    for (int ibe = 0; ibe < Th.nbe; ibe++) {
+        const BoundaryEdgeS &K(Th.be(ibe));
+        int ivv[2];
+        bool nosplit=0;
+        ivv[0] = Th.operator( )(K[0]);
+        ivv[1] = Th.operator( )(K[1]);
+        SortArray< int, 2 > key = keyedge(ivv[0],ivv[1]);
+        auto it =edges.find(key);
+        if( it  ) // edge exist
+        {
+            int nue = it->v;
+            nosplit = nwe[nue]==2;
+        }//
+        
+        
+        if( !nosplit)continue;
+        
+        R3 *vertexedgesub = new R3[nv1Dsub];
+        int *newindex = new int[nv1Dsub];
+        
+        for (int iv = 0; iv < nv1Dsub; iv++) {
+            double alpha = vertex1Dsub[iv].x;
+            
+            vertexedgesub[iv].x = alpha * Th.vertices[ivv[0]].x + (1. - alpha) * Th.vertices[ivv[1]].x;
+            vertexedgesub[iv].y = alpha * Th.vertices[ivv[0]].y + (1. - alpha) * Th.vertices[ivv[1]].y;
+            vertexedgesub[iv].z = alpha * Th.vertices[ivv[0]].z + (1. - alpha) * Th.vertices[ivv[1]].z;
+        }
+        
+        for (int iv = 0; iv < nv1Dsub; iv++) {
+            const Vertex3 &vi(vertexedgesub[iv]);
+            Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+            assert(pvi);
+            newindex[iv] = pvi - vertices;
+        }
+        for (int ii = 0; ii < nedge1Dsub; ii++) {
+            int ivb[2];
+            
+            for (int jjj = 0; jjj < 2; jjj++) {
+                ivb[jjj] = newindex[edge1Dsub[2 * ii + jjj]];
+                assert(edge1Dsub[2 * ii + jjj] < nvsub);
+                if (verbosity > 199) {
+                    cout << "        " << ivb[jjj] << " np:" << np << endl;
+                }
+                
+                assert(ivb[jjj] < np);
+            }
+            bbedges[ie].set(vertices, ivb, K.lab);
             ie++;
-          }
+            if(ie > nbe  ) cout << " Bug " << ie << " "<< nbe << endl;
+            
         }
-        assert(ie <= nbe);
-      }
+        delete[] vertexedgesub;
+        delete[] newindex;
     }
-  }
-
-  if (verbosity > 10) cout << "    ++ np=" << np << "==  nv=" << nvmax << endl;
-
-  ffassert(np <= nv);
-  if (verbosity > 8) cout << "   -- Number of new  border face not on Border " << ie << endl;
-
-  delete[] vertexsub;
-  delete[] trisub;
-  delete[] edgesub;
-
-  // split border elements Edges
-  int nv1Dsub = kksplit + 1;
-  int nedge1Dsub = kksplit;
-  R1 *vertex1Dsub;
-  int *edge1Dsub;
-
-  SplitSimplex< R1 >(kksplit, nv1Dsub, vertex1Dsub, nedge1Dsub, edge1Dsub);
-
-  for (int ibe = 0; ibe < Th.nbe; ibe++) {
-      int iff;
-    bool allnosplit=1;
-    int it = Th.BoundaryElement(ibe, iff);
-    int nkb = Th.nElementonB(it, iff);//  manifold nkb ==2
-    int ifff = iff, itt = Th.ElementAdj(it, ifff);
-    allnosplit =split[it] != 0;
-      int kk=1;
-      // loop on all triangles contening edge !!!
-    while (itt >0 && itt != it)
-    {
-        allnosplit =split[itt] != 0;
-        itt = Th.ElementAdj(itt, ifff);
-        kk++;
-       // cout << kk << " "<< nkb << "/ " << it << " " <<itt << endl;
-        ffassert(kk<=nkb);
+    delete[] vertex1Dsub;
+    delete[] edge1Dsub;
+    if(nbe!=ie) cout << " nbe "<< nbe << " == "<< ie << endl;
+    ffassert(nbe==ie);
+    nbe = ie;
+    if (verbosity > 3) {
+        cout << "  - Nb of vertices       " << nv << endl;
+        cout << "  - Nb of triangle       " << nt << " == " << itt << endl;
+        cout << "  - Nb of boundary edges " << nbe << endl;
     }
+    ffassert(itt==nt);
 
-    if (split[it] == 0 && split[itt] == 0) {
-      continue;    // boundary not on one element
-    }
-    if( allnosplit)continue;
-    const BoundaryEdgeS &K(Th.be(ibe));
-    int ivv[2];
-
-    ivv[0] = Th.operator( )(K[0]);
-    ivv[1] = Th.operator( )(K[1]);
-
-    R3 *vertexedgesub = new R3[nv1Dsub];
-    int *newindex = new int[nv1Dsub];
-
-    for (int iv = 0; iv < nv1Dsub; iv++) {
-      double alpha = vertex1Dsub[iv].x;
-
-      vertexedgesub[iv].x = alpha * Th.vertices[ivv[0]].x + (1. - alpha) * Th.vertices[ivv[1]].x;
-      vertexedgesub[iv].y = alpha * Th.vertices[ivv[0]].y + (1. - alpha) * Th.vertices[ivv[1]].y;
-      vertexedgesub[iv].z = alpha * Th.vertices[ivv[0]].z + (1. - alpha) * Th.vertices[ivv[1]].z;
-    }
-
-    for (int iv = 0; iv < nv1Dsub; iv++) {
-      const Vertex3 &vi(vertexedgesub[iv]);
-      Vertex3 *pvi = gtree->ToClose(vi, hseuil);
-      assert(pvi);
-      newindex[iv] = pvi - vertices;
-    }
-    for (int ii = 0; ii < nedge1Dsub; ii++) {
-      int ivb[2];
-
-      for (int jjj = 0; jjj < 2; jjj++) {
-        ivb[jjj] = newindex[edge1Dsub[2 * ii + jjj]];
-        assert(edge1Dsub[2 * ii + jjj] < nvsub);
-        if (verbosity > 199) {
-          cout << "        " << ivb[jjj] << " np:" << np << endl;
-        }
-
-        assert(ivb[jjj] < np);
-      }
-      bbedges[ie].set(vertices, ivb, K.lab);
-      ie++;
-        if(ie >= nbe  ) cout << " Bug " << ie << " "<< nbe << endl;
-     
-    }
-      ffassert(ie <= nbe);
-    delete[] vertexedgesub;
-    delete[] newindex;
-  }
-  delete[] vertex1Dsub;
-  delete[] edge1Dsub;
-  nbe = ie;
-  if (verbosity > 3) {
-    cout << "  - Nb of vertices       " << nv << endl;
-    cout << "  - Nb of triangle       " << nt << endl;
-    cout << "  - Nb of boundary edges " << nbe << endl;
-  }
-  bool rebuildboundary=false;
-  MeshS *Tht = new MeshS(nv, itt, nbe, vertices, triangles, bbedges, cleanmesh, removeduplicate, rebuildboundary, orientation, precis_mesh);
-      
-  Tht->BuildGTree( );    // Add JM. Oct 2010
-
-  delete gtree;
-
-  return Tht;
+    bool rebuildboundary=false;
+    MeshS *Tht = new MeshS(nv, itt, nbe, vertices, triangles, bbedges, cleanmesh, removeduplicate, rebuildboundary, orientation, precis_mesh);
+    
+    Tht->BuildGTree( );    // Add JM. Oct 2010
+    
+    delete gtree;
+    
+    return Tht;
 }
 
       

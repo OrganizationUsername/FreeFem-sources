@@ -37,7 +37,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
     - trunc of surface mesh, a bug can occur in case on non manifold case (memory fault)
-       (Thanks to PHT) 22/Sep/25
+       (Thanks to PHT) 22/Sep/25, 24/Sep/25 recorrect because the basic trunc bugs (hard bug, conseptual ).
     - in formal operation in array  (ie [1]-[1] is not [0] but [2], same for "./" and ".*" operator  ) 3/Sep/25
     - fixed the size of block sparse matrix : the size zero matrix (expression  0) could be a positive number,
     but the size of null Z,  ( `matrix Z(0,0);`) coubd be no negative :
