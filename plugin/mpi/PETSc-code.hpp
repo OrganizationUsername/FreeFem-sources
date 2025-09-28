@@ -360,7 +360,7 @@ namespace PETSc {
       AnyType operator()(Stack s) const;
 
       Op(Expression x, Expression y) : b(new Call_FormBilinear<fes1, fes2>(*dynamic_cast<const Call_FormBilinear<fes1, fes2>*>(y))), a(x) {
-          assert(b && b->nargs);
+          ffassert(b && b->nargs);
           ffassert(FieldOfForm(b->largs, IsComplexType<upscaled_type<K>>::value) == IsComplexType<upscaled_type<K>>::value);
 
           #if defined(WITH_bemtool) && defined(WITH_htool) && defined(PETSC_HAVE_HTOOL)
@@ -391,7 +391,7 @@ namespace PETSc {
     typedef typename fes2::FESpace FESpace2;
     typedef typename FESpace2::Mesh Mesh2;
 
-    assert(b && b->nargs);
+    ffassert(b && b->nargs);
     pfes1* pUh = GetAny<pfes1*>((*b->euh)(stack));
     pfes2* pVh = GetAny<pfes2*>((*b->evh)(stack));
     const FESpace1* PUh = (FESpace1*)**pUh;
@@ -714,7 +714,7 @@ namespace PETSc {
       }
       int size;
       MPI_Comm_size(A->_A->getCommunicator(), &size);
-      assert(size == 1 || k);
+      ffassert(size == 1 || k);
       communicators->operator[](0).resize(k);
       communicators->resize(2 * k + 1);
     }
@@ -1890,7 +1890,7 @@ namespace PETSc {
         }
       }
       if (err) CompileError("Wrong format of block matrix");
-      assert(N && M);
+      ffassert(N && M);
       e_M = new Expression*[N];
       t_M = new int*[N];
       for (int i = 0; i < N; ++i) {
@@ -2432,10 +2432,10 @@ namespace PETSc {
     int level = 0;
     if (c != 0) {
       tabA = GetAny< KN< Dmat >* >((*A)(stack));
-      assert(tabA->N( ) > 0);
+      ffassert(tabA->N( ) > 0);
       if (c == 2) {
         level = GetAny< long >((*P)(stack));
-        assert(0 <= level && level < tabA->N( ));
+        ffassert(0 <= level && level < tabA->N( ));
         level = tabA->N( ) - level - 1;
       }
       ptA = reinterpret_cast< Type* >(&tabA->operator[](level));
@@ -5018,6 +5018,7 @@ namespace PETSc {
         Vec x, y;
         double timing = MPI_Wtime( );
         MatCreateVecs((*t)._petsc, &x, &y);
+        ffassert(out->N() == u->N() && out->M() == u->M());
         PetscScalar* ptr;
         MatType type;
         PetscBool isType;
@@ -5067,7 +5068,7 @@ namespace PETSc {
           }
           VecRestoreArray(x, &ptr);
         }
-        else if ( std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
+        else if (std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
                           HpSchwarz< PetscScalar > >::value) {
           VecGetArray(x, &ptr);
           for(int i = 0; i < u->n; ++i)
@@ -5297,12 +5298,12 @@ namespace PETSc {
             loopDistributedVec<0, N>(t->_petsc, t->_exchange, u, ptr);
           } else {
             if(t->_A)
-              assert(u->n == t->_A->getDof() && out->n == t->_A->getDof());
+              ffassert(u->n == t->_A->getDof() && out->n == t->_A->getDof());
             else if (t->_exchange) {
               if (N == 'T') {
-                assert(u->n == t->_exchange[0]->getDof() && out->n == t->_exchange[1]->getDof());
+                ffassert(u->n == t->_exchange[0]->getDof() && out->n == t->_exchange[1]->getDof());
               } else {
-                assert(u->n == t->_exchange[1]->getDof() && out->n == t->_exchange[0]->getDof());
+                ffassert(u->n == t->_exchange[1]->getDof() && out->n == t->_exchange[0]->getDof());
               }
             }
             for(int i = 0; i < u->n; ++i)
@@ -6104,7 +6105,7 @@ namespace PETSc {
         Op(Expression aa,Expression  bb,int initt)
           : b(new Call_CompositeFormBilinear<vect_generic_v_fes,vect_generic_v_fes>(* dynamic_cast<const Call_CompositeFormBilinear<vect_generic_v_fes,vect_generic_v_fes> *>(bb))),a(aa),init(initt)
       {
-        assert(b && b->nargs);
+        ffassert(b && b->nargs);
         int NN = (int) b->euh->componentNbitem().size();
         int MM = (int) b->evh->componentNbitem().size();
 
@@ -6246,7 +6247,7 @@ namespace PETSc {
   AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) const
   {
     typedef PetscScalar R;
-    assert(b && b->nargs);
+    ffassert(b && b->nargs);
 
     pvectgenericfes  * pUh= GetAny<pvectgenericfes *>((*b->euh)(stack));
     pvectgenericfes  * pVh= GetAny<pvectgenericfes *>((*b->evh)(stack));
