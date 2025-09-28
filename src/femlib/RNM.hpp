@@ -1305,7 +1305,7 @@ class KNM: public KNM_<R>{ public:
        this->shapei.init(nn,1,nn);
        this->shapej.init(mm,nn,1);
 
-       if(this->v && vo)  // copy
+       if(this->v && vo && n && m)  // copy
 	 (*this)(SubArray(no),SubArray(mo)) = old(SubArray(no),SubArray(mo));
 
        delete []vo;
