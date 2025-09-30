@@ -99,7 +99,7 @@ public:
 	    //  here a mortar is a connected componand of he whole edge of the coarse triangle
 	    //   minus  the extremite of mortar
 	    //  -----------
-	    int NbCollision=0,NbOfEdges=0,NbOfBEdges=0,NbOfMEdges=0;
+	    int NbCollision=0,NbOfEdges=0,NbOfBEdges=0;
 	    const char MaskEdge[]={1,2,4};
 	    const char AddMortar[]={8,16,32};
 	    //    reffecran();
@@ -246,17 +246,7 @@ public:
 			}
 
 			if (NbAdj) NbOfEdges++;
-			if(NbAdj==1)
-                        {
-                            if (! (TonBoundary[i]& MaskEdge[j]) && 0)
-			    { NbOfMEdges++;
-				if(verbosity>99)
-				    cout << " Edge (" << j0 << " "<< j1 << ") : "  << j  << " of Triangle " << &T-triangles << " on mortar \n"
-				    <<" --- > " << number(T[0]) << " " << number(T[1]) << " " << number(T[2]) << " /" << int(TonBoundary[i])<< "\n" ;
-				TonBoundary[i]+= AddMortar[j];
-			    }
-				else { NbOfBEdges++; }
-                        }
+			if(NbAdj==1) NbOfBEdges++;
 		    }
 		}
 
@@ -265,7 +255,6 @@ public:
 			<< nt << endl ;
 			cout << "    Nb of edge on user boundary  " << neb
 			<< " ,  Nb of edges on true boundary  " << NbOfBEdges << endl;
-			if(NbOfMEdges) cout << "    Nb of edges on Mortars  = " << NbOfMEdges << endl;
 
 		    }
 		    delete [] Head; // cleanning memory
@@ -481,10 +470,8 @@ public:
 							{pV = &V;break;} //  ok good
 						    }
 						}
-						if ( ! (p>=0 && pV))
-						    throwassert(p>=0 && pV); //  PB reach the end without founding
-						if ( ! ( Abs((AM.perp(),A-*pV)) < 1e-5) )
-						    throwassert( Abs((AM.perp(),A-*pV)) < 1e-5);
+						throwassert(p>=0 && pV); //  PB reach the end without founding
+						throwassert( Abs((AM.perp(),A-*pV)) < 1e-5);
 
 						throwassert(sm != number(pV));
 						int kkgd= 3*k + j;
@@ -499,8 +486,7 @@ public:
 
 						    throwassert( s == number(triangles[kkgd/3][VerticesOfTriangularEdge[kkgd%3][dg]]));
 						    sgd[gd]=s;// save the last
-							if ( ! ( Abs((AM.perp(),A-vertices[s])) < 1e-5) )
-							    throwassert( Abs((AM.perp(),A-vertices[s])) < 1e-5);
+							throwassert( Abs((AM.perp(),A-vertices[s])) < 1e-5);
 							throwassert(kkgd>=0 && kkgd < 3*nt);
 							if (datamortars)
 							{
@@ -610,7 +596,6 @@ public:
 		{
 		    cout << "    Number of Edges                 = " << NbOfEdges << endl;
 		    cout << "    Number of Boundary Edges        = " << NbOfBEdges << " neb = " << neb << endl;
-		    cout << "    Number of Mortars  Edges        = " << NbOfMEdges << endl;
 		    cout << "    Nb Of Mortars with Paper Def    = " <<  NbMortarsPaper << " Nb Of Mortars = " << NbMortars;
 		    cout << "    Euler Number nt- NbOfEdges + nv = "
 			<< nt + NbMortars - NbOfEdges + nv << "= Nb of Connected Componant - Nb Of Hole "
@@ -2200,11 +2185,6 @@ Mesh::Mesh(const Mesh & Th,int * split,bool WithMortar,int label)
 		    R2 G=(A+B+C)/3.,PHat;
 		    double d=Area2(A,B,C);
 		    dmin=min(d,dmin);
-		    if(d<=1e-5 && 0)
-		    {
-			cout<< " T = "<<  i << " det= " << d << "  ::  " << A << " " << B << " " << C  << endl;
-
-		    }
 		    bool outside;
 		    const Triangle * t=Th.Find(G,PHat,outside,0);
 		    if(!outside ) {
