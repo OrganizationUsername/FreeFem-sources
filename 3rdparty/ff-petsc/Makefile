@@ -52,7 +52,7 @@ PETSC_DOWNLOAD_C := --with-metis-dir=$(DIR_INSTALL_REAL) \
 		--with-suitesparse-dir=$(DIR_INSTALL_REAL) \
 		--with-parmetis-dir=$(DIR_INSTALL_REAL) \
 		--with-tetgen-dir=$(DIR_INSTALL_REAL) \
-		--with-gsl-dir=$(DIR_INSTALL_REAL) \
+		--with-gsl-dir=$(DIR_INSTALL_REAL)
 PETSC_DOWNLOAD := --download-metis --download-ptscotch --download-ptscotch-commit=v7.0.10 \
 		--download-hypre --download-parmetis \
 		--download-superlu --download-suitesparse --download-tetgen \
