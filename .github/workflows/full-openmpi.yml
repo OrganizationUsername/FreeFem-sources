@@ -41,7 +41,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install gcc g++ gfortran m4 patch git wget cmake \
-          libhdf5-dev libgsl-dev flex bison autoconf automake \
+          libhdf5-dev flex bison autoconf automake \
           autotools-dev libopenmpi-dev
 
       - name: Configure

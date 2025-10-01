@@ -1067,6 +1067,7 @@ esac
                         AC_FF_PETSC_WHERELIB(mmg,MMG_LIB,MMG_INCLUDE,$ffconfpetsc)
                         AC_FF_PETSC_WHERELIB(parmmg,PARMMG_LIB,PARMMG_INCLUDE,$ffconfpetsc)
 		        AC_FF_PETSC_WHERELIB(scalapack,SCALAPACK_LIB,SCALAPACK_INCLUDE,$ffconfpetsc)
+		        AC_FF_PETSC_WHERELIB(gsl,GSL_LIB,GSL_INCLUDE,$ffconfpetsc)
   		        AC_FF_PETSC_WHERELIB(suitesparse,SUITESPARSE_LIB,SUITESPARSE_INCLUDE,$ffconfpetsc,$ff_METIS_LIB)
  dnl               if test -n "$ff_SUITESPARSE_LIB" -a -n "$ff_METIS_LIB"; then
  dnl                   ff_where_lib_suitesparse="$ff_METIS_LIB $ff_SUITESPARSE_LIB"
@@ -1172,6 +1173,7 @@ esac
             AC_FF_PETSC_WHERELIB(mmg,MMG_LIB,MMG_INCLUDE,$ffconfpetscc)
             AC_FF_PETSC_WHERELIB(parmmg,PARMMG_LIB,PARMMG_INCLUDE,$ffconfpetscc)
             AC_FF_PETSC_WHERELIB(scalapack,SCALAPACK_LIB,SCALAPACK_INCLUDE,$ffconfpetscc)
+            AC_FF_PETSC_WHERELIB(gsl,GSL_LIB,GSL_INCLUDE,$ffconfpetscc)
             AC_FF_PETSC_WHERELIB(suitesparse,SUITESPARSE_LIB,SUITESPARSE_INCLUDE,$ffconfpetscc)
             if test -z "$ff_BLASLAPACK_LIB"; then
             AC_FF_PETSC_WHERELIB(blaslapack,BLASLAPACK_LIB,BLASLAPACK_INCLUDE,$ffconfpetscc)
