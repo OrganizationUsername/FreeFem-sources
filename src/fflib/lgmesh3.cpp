@@ -915,25 +915,42 @@ class ReadMesh3 :  public E_F0 { public:
     
   Expression filename; 
   typedef pmesh3  Result;
-  ReadMesh3(const basicAC_F0 & args) 
+    
+    static const int n_name_param = 3;
+    static basicAC_F0::name_and_type name_param [];
+    Expression nargs[n_name_param];
+
+  ReadMesh3(const basicAC_F0 & args)
   {   
-    args.SetNameParam(); 
-    filename=to<string*>(args[0]);   
+      args.SetNameParam(n_name_param, name_param, nargs);
+    filename=to<string*>(args[0]);
   }   
   static ArrayOfaType  typeargs() { return  ArrayOfaType(atype<string*>());}
-  static  E_F0 * f(const basicAC_F0 & args){ return new ReadMesh3(args);} 
+  static  E_F0 * f(const basicAC_F0 & args){ return new ReadMesh3(args);}
   AnyType operator()(Stack stack) const;
+};
+basicAC_F0::name_and_type ReadMesh3::name_param [] = {
+    {"cleanmesh", &typeid(bool)},
+    {"removeduplicate", &typeid(bool)},
+    {"rebuildboundary", &typeid(bool)}
 };
 
 
-AnyType ReadMesh3::operator()(Stack stack) const 
+AnyType ReadMesh3::operator()(Stack stack) const
 {
   using  Fem2D::MeshPointStack;
  
   string * fn =  GetAny<string*>((*filename)(stack));
+    bool clean = 0;
+    bool rmdup = 0;
+    bool rbbd = 0;
+    if(nargs[0]) clean =GetAny<bool>( (*(nargs[0]))(stack));
+    if(nargs[1]) rmdup =GetAny<bool>( (*(nargs[1]))(stack));
+    if(nargs[2]) rbbd =GetAny<bool>( (*(nargs[2]))(stack));
+
   if(verbosity > 2)
-      cout << "ReadMesh3 " << *fn << endl;
-  Mesh3 *Thh = new Mesh3(*fn);
+      cout << "ReadMesh3 " << *fn << "  clean " << clean << " rmdup " << rmdup << " rbbd " <<rbbd <<endl;
+  Mesh3 *Thh = new Mesh3(*fn,clean,rmdup,rbbd);
 
   Thh->BuildGTree();
     if (Thh->meshS) Thh->meshS->BuildGTree();
@@ -2971,6 +2988,7 @@ void init_lgmesh3() {
   TheOperators->Add("=", new OneOperator2<pmeshL*,pmeshL*,pmeshL >(&set_eqdestroy_incr));
 
   Global.Add("readmesh3","(",new OneOperatorCode<ReadMesh3>);
+    
   Global.Add("readmeshS","(",new OneOperatorCode<ReadMeshS>);
   Global.Add("readmeshL","(",new OneOperatorCode<ReadMeshL>);
   Global.Add("savemesh","(",new OneOperatorCode<SaveMesh3>);
