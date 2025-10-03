@@ -51,10 +51,12 @@ PETSC_DOWNLOAD_C := --with-metis-dir=$(DIR_INSTALL_REAL) \
 		--with-superlu-dir=$(DIR_INSTALL_REAL) \
 		--with-suitesparse-dir=$(DIR_INSTALL_REAL) \
 		--with-parmetis-dir=$(DIR_INSTALL_REAL) \
-		--with-tetgen-dir=$(DIR_INSTALL_REAL)
+		--with-tetgen-dir=$(DIR_INSTALL_REAL) \
+		--with-gsl-dir=$(DIR_INSTALL_REAL)
 PETSC_DOWNLOAD := --download-metis --download-ptscotch --download-ptscotch-commit=v7.0.10 \
 		--download-hypre --download-parmetis \
-		--download-superlu --download-suitesparse --download-tetgen
+		--download-superlu --download-suitesparse --download-tetgen \
+		--download-gsl=https://mirrors.kernel.org/gnu/gsl/gsl-2.8.tar.gz
 ifneq ($(TOOL_DYLIB_mmg),)
 PETSC_DOWNLOAD += --download-mmg
 PETSC_DOWNLOAD_C += --with-mmg-dir=$(DIR_INSTALL_REAL)
@@ -103,7 +105,7 @@ endif
 endif
 
 ifeq ($(WIN32DLLTARGET),)
-PETSC_DOWNLOAD += --download-bison
+PETSC_DOWNLOAD += --download-bison=https://mirrors.kernel.org/gnu/bison/bison-3.8.2.tar.gz
 ifneq ($(FC),)
 ifneq ($(wildcard ~/.petsc_pkg),)
 PETSC_DOWNLOAD += --download-slepc-configure-arguments="--download-arpack --with-packages-download-dir=~/.petsc_pkg"
