@@ -505,7 +505,7 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                                 eigenvectors->set(i, cpy);
                             if(eigenarray && !codeA) {
                                 KN<K> cpy(m, pt);
-                                (*eigenarray)(':', i) = cpy;
+                                (*eigenarray)(':', long(i)) = cpy;
                             }
                             if(std::is_same<SType, SVD>::value || (std::is_same<SType, EPS>::value && (othervectors || otherarray) && isTwoSided)) {
                                 KN<K> cpy(ptA->_cnum && ptA->_exchange[1] ? ptA->_exchange[1]->getDof() : (ptA->_A ? ptA->_A->getDof() : 0));
@@ -524,18 +524,18 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                                     othervectors->set(i, cpy);
                                 if(otherarray && !codeA) {
                                     KN<K> cpy(nr, pti);
-                                    (*otherarray)(':', i) = cpy;
+                                    (*otherarray)(':', long(i)) = cpy;
                                 }
                             }
                         }
                         if(codeA || isType || !ptA->_A) {
                             if(eigenarray) {
                                 KN<K> cpy(m, pt);
-                                (*eigenarray)(':', i) = cpy;
+                                (*eigenarray)(':', long(i)) = cpy;
                             }
                             if(otherarray) {
                                 KN<K> cpy(nr, pti);
-                                (*otherarray)(':', i) = cpy;
+                                (*otherarray)(':', long(i)) = cpy;
                             }
                         }
                         if(!std::is_same<SType, SVD>::value && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value) {

@@ -867,7 +867,8 @@ namespace PETSc {
           if (ptA->_cnum) {
             PetscInt* cnum = ptA->_num + dN->HPDDM_n;
             if (ptA->_petsc) {
-                int rank, size, N;
+                int rank, size;
+                PetscInt N;
                 unsigned int flag = mN->nnz && mN->nnz == mN->n * mN->m ? 1 : 0;
                 MPI_Comm_size(PetscObjectComm((PetscObject)ptA->_petsc), &size);
                 if (size > 1) {
