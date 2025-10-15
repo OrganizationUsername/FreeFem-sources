@@ -1570,8 +1570,10 @@ AnyType SetMatrixInterpolationT1(Stack stack,Expression emat,Expression einter,i
   ffassert(einter);
   pfesT1 * pUh = GetAny< pfesT1 * >((* mi->a)(stack));
   FESpaceT1 * Uh = **pUh;
+  int n = 0, m = 0;
   if(Uh) {
     int NUh =Uh->N;
+    n = Uh->NbOfDF;
     int* data = new int[4 + NUh];
     data[0]=mi->arg(0,stack,false); // transpose not
     data[1]=mi->arg(1,stack,(long) op_id); ; // get just value
@@ -1585,6 +1587,7 @@ AnyType SetMatrixInterpolationT1(Stack stack,Expression emat,Expression einter,i
       FESpaceT2 * Vh = **pVh;
       if(Vh) {
         int NVh =Vh->N;
+        m = Vh->NbOfDF;
         for(int i=0;i<NUh;++i)
         data[4+i]=i;//
         for(int i=0;i<min(NUh,(int) U2Vc.size());++i)
@@ -1618,6 +1621,16 @@ AnyType SetMatrixInterpolationT1(Stack stack,Expression emat,Expression einter,i
       sparse_mat->A.master(buildInterpolationMatrixT1<FESpaceT1>(*Uh,xx,yy,zz,data));
     }
     delete [] data;
+  } else {
+      pfesT2 * pVh = GetAny<  pfesT2 * >((* mi->b)(stack));
+      FESpaceT2 * Vh = **pVh;
+      if(Vh) m = Vh->NbOfDF;
+  }
+  if ((m == 0 || n == 0) && m != n) {
+    HashMatrix<int,R> *phm= new HashMatrix<int,R>(n,m,0,0);
+    MatriceCreuse<R> *pmc(phm);
+    sparse_mat->typemat=0;
+    sparse_mat->A.master(pmc);
   }
   return sparse_mat;
 }
