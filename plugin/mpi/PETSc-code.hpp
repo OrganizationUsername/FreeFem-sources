@@ -2240,12 +2240,12 @@ namespace PETSc {
                        !std::is_same< T, KN< PetscScalar > >::value && !std::is_same< T, KNM< PetscScalar > >::value &&
                        !std::is_same< T, KN< long > >::value && !std::is_same< T, KNM< long > >::value>::type* = nullptr >
   void resize(T* v, int n, int m) {}
-  template< class T, typename std::enable_if< std::is_same< T, KN< PetscScalar > >::value || std::is_same< T, KN< long > >::value >::type* =
+  template< class T, typename std::enable_if< std::is_same< T, KN< upscaled_type<PetscScalar> > >::value || std::is_same< T, KN< long > >::value >::type* =
                        nullptr >
   void init_KN_or_KNM(T* v, T* w) {
     v->init(w->n);
   }
-  template< class T, typename std::enable_if< std::is_same< T, KNM< PetscScalar > >::value || std::is_same< T, KNM< long > >::value >::type* =
+  template< class T, typename std::enable_if< std::is_same< T, KNM< upscaled_type<PetscScalar> > >::value || std::is_same< T, KNM< long > >::value >::type* =
                        nullptr >
   void init_KN_or_KNM(T* v, T* w) {
     v->init(w->N(), w->M());
@@ -5084,9 +5084,9 @@ namespace PETSc {
         else if (std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
                           HpSchwarz< PetscScalar > >::value) {
 #if !defined(PETSC_USE_REAL_DOUBLE)
-          for(int j = 0; j < out->M(); ++j)
-              for(int i = 0; i < u->N(); ++i)
-                  p[i + j * u->N()] = u->operator[](i, j);
+          ffassert(u->M() == 1);
+          for(int i = 0; i < u->N(); ++i)
+              p[i] = u->operator[](i);
 #else
           static_assert(std::is_same<PetscReal, upscaled_type<PetscReal>>::value, "Wrong types");
 #endif
