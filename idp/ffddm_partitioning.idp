@@ -665,9 +665,7 @@ prfe#K[int][int] prfe#snd(0);
 
 int prfe#Ndofglobal = 0;
 
-IFMACRO(prmsh#buildAug,1)
 matrix prfe#Auginterp;
-ENDIFMACRO
 
 /* Update u_i = R_i sum_j (R_j' u_j)
    if (scale) u_i = R_i sum_j (R_j' D_j u_j)

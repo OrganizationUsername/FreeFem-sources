@@ -334,10 +334,12 @@ public:
     HMatrixInv(T v, U w) : t(v), u(w) {}
     
     void solve(U out) const {
+        ffassert(out->n % (*t)->nb_rows() == 0);
+        int mu = out->n / (*t)->nb_rows();
         if ((*t)->solver == "HLU") {
             (*t)->factorization();
-            std::copy_n((K*)*u,(*t)->nb_rows(),(K*)*out);
-            htool::MatrixView<K> out_view((*t)->nb_rows(),1,(K*)*out);
+            std::copy_n((K*)*u,mu*(*t)->nb_rows(),(K*)*out);
+            htool::MatrixView<K> out_view((*t)->nb_rows(),mu,(K*)*out);
             (*t)->solve(out_view);
         }
         else {
@@ -513,6 +515,60 @@ AnyType SetCompressMat(Stack stack,Expression emat,Expression einter,int init)
   return Hmat;
 }
 
+template<class R>
+    class SetHMatrix_Op : public E_F0mps { public:
+        Expression a;
+
+        static aType btype;
+        static const int n_name_param = OpCall_FormBilinear_np::n_name_param;
+        static basicAC_F0::name_and_type name_param[];
+        Expression nargs[n_name_param];
+
+        SetHMatrix_Op(const basicAC_F0 & args,Expression aa) : a(aa) {
+            args.SetNameParam(n_name_param,name_param,nargs);
+        }
+        AnyType operator()(Stack stack) const;
+    };
+
+template<class R>
+class SetHMatrix : public OneOperator { public:
+    SetHMatrix() : OneOperator(SetHMatrix_Op<R>::btype, atype<HMatrixVirt<R> **>() ) {}
+    E_F0 * code(const basicAC_F0 & args) const
+    {
+        return  new SetHMatrix_Op<R>(args,t[0]->CastTo(args[0]));
+    }
+};
+
+template<class R>
+aType SetHMatrix_Op<R>::btype=0;
+template<class R>
+basicAC_F0::name_and_type SetHMatrix_Op<R>::name_param[] = {
+    {"bmat", &typeid(Matrice_Creuse< R > *)},
+    LIST_NAME_PARM_MAT,
+    LIST_NAME_PARM_HMAT
+};
+
+template<class R>
+AnyType SetHMatrix_Op<R>::operator()(Stack stack) const
+{
+    HMatrixVirt<R> ** A = GetAny<HMatrixVirt<R> **>((*a)(stack));
+    ffassert(A);
+
+    Data_Bem_Solver ds;
+    SetEnd_Data_Bem_Solver<R>(stack,ds,nargs,OpCall_FormBilinear_np::n_name_param);
+    (*A)->solver = ds.solver;
+    cout << (*A)->solver << endl;
+    if (ds.factorize && (ds.solver == "HLU"))
+        (*A)->factorization();
+
+    return Nothing;
+}
+
+template<class K>
+long get_hmat_n(HMatrixVirt<K>** p) {return (p && *p) ? (*p)->nb_rows() : 0;}
+template<class K>
+long get_hmat_m(HMatrixVirt<K>** p) {return (p && *p) ? (*p)->nb_cols() : 0;}
+
 template<class K>
 void addHmat() {
    // Dcl_Type<HMatrixVirt<K>**>(Initialize<HMatrixVirt<K>*>, Delete<HMatrixVirt<K>*>);
@@ -525,7 +581,12 @@ void addHmat() {
     TheOperators->Add("*", new OneOperator2<Prod<KN<K>*, K>, HMatrixVirt<K>**, KN<K>*>(Build));
     TheOperators->Add("=", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K>>(Prod<KN<K>*, K>::mv));
     TheOperators->Add("<-", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K>>(Prod<KN<K>*, K>::init));
-    
+
+    Global.Add("set","(",new SetHMatrix<K>);
+
+    Add<HMatrixVirt<K>**>("n",".",new OneOperator1<long,HMatrixVirt<K>**>(get_hmat_n<K>));
+    Add<HMatrixVirt<K>**>("m",".",new OneOperator1<long,HMatrixVirt<K>**>(get_hmat_m<K>));
+
     addInv<HMatrixVirt<K>*, HMatrixInv, KN<K>, K>();
     
     Global.Add("display","(",new plotHMatrix<K>);

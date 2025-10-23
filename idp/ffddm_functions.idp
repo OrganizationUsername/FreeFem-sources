@@ -443,12 +443,28 @@ func preffe#K[int] pr#PREC1(preffe#K[int] &l, int mrhs)
         }
       }
       else if (!preffe#prmesh#excluded){
-        preffe#K[int] aux = l;
+        preffe#K[int] aux(mrhs*pr#aR[mpiRank(preffe#prmesh#commddm)].n);
+        /* for bem, the local HMatrix is defined on the Augmented mesh, so we need to extend -> solve -> restrict */
+        if (pr#aR[mpiRank(preffe#prmesh#commddm)].n == preffe#Auginterp.m) {
+          for (int m=0; m<mrhs; m++)
+            aux(m*preffe#Auginterp.m:(m+1)*preffe#Auginterp.m-1) = preffe#Auginterp'*l(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1);
+        }
+        else
+          aux = l;
+
         if(pr#prec == "soras")
         for (int m=0; m<mrhs; m++)
           aux(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1) = aux(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1) .* preffe#Dk[mpiRank(preffe#prmesh#commddm)];
-        /* s = aR[mpirank]^-1 * l; */
-        s = pr#aR[mpiRank(preffe#prmesh#commddm)]^-1 * aux;
+
+        /* for bem, the local HMatrix is defined on the Augmented mesh, so we need to extend -> solve -> restrict */
+        if (pr#aR[mpiRank(preffe#prmesh#commddm)].n == preffe#Auginterp.m) {
+          preffe#K[int] saug = pr#aR[mpiRank(preffe#prmesh#commddm)]^-1 * aux;
+          for (int m=0; m<mrhs; m++)
+            s(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1) = preffe#Auginterp*saug(m*preffe#Auginterp.m:(m+1)*preffe#Auginterp.m-1);
+        }
+        else
+          s = pr#aR[mpiRank(preffe#prmesh#commddm)]^-1 * aux;
+
         if(pr#prec != "asm"){
           for (int m=0; m<mrhs; m++)
             pr#prfe#update(s(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1),true);

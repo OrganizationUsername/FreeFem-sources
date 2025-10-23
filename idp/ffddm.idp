@@ -33,7 +33,7 @@ matrix pr#CSinterp;
 ENDIFMACRO
 
 matrix<pr#prfe#K> pr#AglobEprec;
-matrix<pr#prfe#K>[int] pr#aR(pr#prfe#prmesh#npart);       /* local (ras or Robin) matrices (for the preconditioner) */
+pr#Tmatrix<pr#prfe#K>[int] pr#aR(pr#prfe#prmesh#npart);       /* local (ras or Robin) matrices (for the preconditioner) */
 matrix<pr#prfe#K> pr#aRdEprec;
 
 string pr#prec = "none";
@@ -496,21 +496,15 @@ if (pr#prfe#prmesh#isincomm)
 
 		if (pr#prfe#prmesh#Thi.nt > 0) {
 		  if (pr#prec == "oras" || pr#prec == "soras"){
-		    IFMACRO(!pr#bem)
 		    IFMACRO(pr#myPrecond)
 		    pr#myPrecond(pr#aR[i], pr#prfe#prmesh#Thi, pr#prfe#Vhi)
 		    ENDIFMACRO
 		    IFMACRO(!pr#myPrecond)
 		    VarfPrec(RobinInt,pr#prfe#prmesh#Thi,pr#prfe#Vhi)
 		    if (pr#prfe#prmesh#inexactCSsplit > 1)
-		      pr#aR[i] = RobinInt(pr#prfe#Vhi,pr#prfe#Vhi,sym=vsym,tgv=vtgvelim,solver=GMRES);
+		      pr#aR[i] = RobinInt(pr#prfe#Vhi,pr#prfe#Vhi,sym=vsym,tgv=vtgvelim,solver=GMRES,commworld=pr#prfe#prmesh#commself);
 		    else
-		      pr#aR[i] = RobinInt(pr#prfe#Vhi,pr#prfe#Vhi,sym=vsym,tgv=vtgv,solver=GMRES);
-		    ENDIFMACRO
-		    ENDIFMACRO
-		    IFMACRO(pr#bem,1)
-		    cout << "TODO" << endl;
-		    assert(0);
+		      pr#aR[i] = RobinInt(pr#prfe#Vhi,pr#prfe#Vhi,sym=vsym,tgv=vtgv,solver=GMRES,commworld=pr#prfe#prmesh#commself);
 		    ENDIFMACRO
 		  }
 		  else if (pr#prec == "ras" || pr#prec == "asm") {
@@ -526,38 +520,38 @@ if (pr#prfe#prmesh#isincomm)
 		    int[int] Ic = (0:pr#prfe#Vhi.ndof-1);
 		    real[int] Kc(pr#prfe#Vhi.ndof);
 		    Kc = 1;
-		    matrix pr#prfe#Auginterp = [Ic,renum,Kc];
+		    IFMACRO(!pr#bem)
+		    matrix pr#prfe#Auginterp; /* need to keep Auginterp in bem case, otherwise define it only in scope */
+		    ENDIFMACRO
+		    pr#prfe#Auginterp = [Ic,renum,Kc];
 		    pr#prfe#Auginterp.resize(pr#prfe#Vhi.ndof, pr#prfe#AugVhi.ndof);
 		    ENDIFMACRO
 
-		    IFMACRO(!pr#bem)
 		    IFMACRO(pr#myPrecond)
 		    pr#myPrecond(pr#aR[i], pr#prfe#prmesh#AugThi, pr#prfe#AugVhi)
 		    ENDIFMACRO
 		    IFMACRO(!pr#myPrecond)
 		    VarfPrec(vPb, pr#prfe#prmesh#AugThi, pr#prfe#AugVhi)
 		    if (pr#prfe#prmesh#inexactCSsplit > 1)
-		      pr#aR[i] = vPb(pr#prfe#AugVhi, pr#prfe#AugVhi,sym=vsym,tgv=vtgvelim,solver=GMRES);
+		      pr#aR[i] = vPb(pr#prfe#AugVhi, pr#prfe#AugVhi,sym=vsym,tgv=vtgvelim,solver=GMRES,commworld=pr#prfe#prmesh#commself);
 		    else
-		      pr#aR[i] = vPb(pr#prfe#AugVhi, pr#prfe#AugVhi,sym=vsym,tgv=vtgv,solver=GMRES);
+		      pr#aR[i] = vPb(pr#prfe#AugVhi, pr#prfe#AugVhi,sym=vsym,tgv=vtgv,solver=GMRES,commworld=pr#prfe#prmesh#commself);
 		    ENDIFMACRO
-		    ENDIFMACRO
-		    IFMACRO(pr#bem,1)
-		    VarfPrec(vPb, pr#prfe#prmesh#AugThi, pr#prfe#AugVhi)
-		    pr#Tmatrix<pr#prfe#K> Hloc = vPb(pr#prfe#AugVhi, pr#prfe#AugVhi,commworld=pr#prfe#prmesh#commself);
-		    pr#prfe#K[int,int] mdense(pr#prfe#AugVhi.ndof, pr#prfe#AugVhi.ndof);
-		    mdense = Hloc;
-		    pr#aR[i] = mdense;
-		    ENDIFMACRO
-
+		    IFMACRO(!pr#bem)
 		    renumbering(pr#aR[i], pr#prfe#Auginterp, eps=-1);
+		    ENDIFMACRO
 		  }
 		  else if (pr#prec != "none")
 		    assert(0);
 		}
 		ENDIFMACRO
 		IFMACRO((!pr#withhpddm)&(!pr#withpetsc))
+		IFMACRO(!pr#bem)
 		set(pr#aR[i],solver = sparsesolver,sym=vsym,commworld=pr#prfe#prmesh#commself,factorize=3);
+		ENDIFMACRO
+		IFMACRO(pr#bem,1)
+		set(pr#aR[i],solver = "HLU",factorize=3);
+		ENDIFMACRO
 		ENDIFMACRO
   }
   if (bseq)
