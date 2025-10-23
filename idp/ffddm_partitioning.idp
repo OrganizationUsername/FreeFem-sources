@@ -1121,7 +1121,7 @@ if (bseq)
   prfe#Auginterp = interpolate(prfe#AugVhi,prfe#Vhglob);
 else if (bpara)
   prfe#Auginterp = interpolate(prfe#Vhi,prfe#AugVhi);
-prfe#Auginterp.thresholding(1e-10);
+prfe#Auginterp.thresholding(0.99);
 ENDIFMACRO
 // EOM
 
