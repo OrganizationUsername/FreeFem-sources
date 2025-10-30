@@ -22,7 +22,7 @@ case "$1" in
 esac 
 dircommand=`dirname $0`
 if [   -f "WHERE_LIBRARY-download" ] ; then
-dircommand="./"
+    dirwhere="./"
 elif [   -f "$dircommand/WHERE_LIBRARY-download" ] ; then
     dirwhere=$dircommand
 elif [ -f '@ff_prefix_dir@/lib/WHERE_LIBRARY-download' ] ; then
