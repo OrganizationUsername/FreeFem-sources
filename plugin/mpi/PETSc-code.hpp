@@ -5031,6 +5031,11 @@ namespace PETSc {
         double timing = MPI_Wtime( );
         MatCreateVecs((*t)._petsc, &x, &y);
         ffassert(out->N() == u->N() && out->M() == u->M());
+        int mu = 1;
+        if ((*t)._A) {
+          ffassert(out->n % (*t)._A->getDof() == 0);
+          mu = out->n / (*t)._A->getDof();
+        } else ffassert(out->M() == 1);
         PetscScalar* ptr;
         MatType type;
         PetscBool isType;
@@ -5038,7 +5043,7 @@ namespace PETSc {
         PetscStrcmp(type, MATNEST, &isType);
         PetscScalar* p = reinterpret_cast<PetscScalar*>(u->operator upscaled_type<PetscScalar>*());
         if ((*t)._vector_global) {
-          ffassert(out->M() == 1);
+          ffassert(mu == 1);
           for(int i = 0; i < u->n; ++i)
               p[i] = u->operator[](i);
           MPI_Allreduce(MPI_IN_PLACE, p, u->n, HPDDM::Wrapper<K>::mpi_type(), MPI_SUM, PetscObjectComm((PetscObject)(*t)._petsc));
@@ -5084,13 +5089,13 @@ namespace PETSc {
         else if (std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
                           HpSchwarz< PetscScalar > >::value) {
 #if !defined(PETSC_USE_REAL_DOUBLE)
-          ffassert(u->M() == 1);
+          ffassert(mu == 1);
           for(int i = 0; i < u->N(); ++i)
               p[i] = u->operator[](i);
 #else
           static_assert(std::is_same<PetscReal, upscaled_type<PetscReal>>::value, "Wrong types");
 #endif
-          if (out->M() == 1) {
+          if (mu == 1) {
             VecGetArray(x, &ptr);
             if(isType) {
               ffassert((std::is_same<PetscReal, upscaled_type<PetscReal>>::value));
@@ -5107,15 +5112,15 @@ namespace PETSc {
             PetscInt m, M;
             MatGetLocalSize((*t)._petsc, &m, nullptr);
             MatGetSize((*t)._petsc, &M, nullptr);
-            MatCreateDense(PetscObjectComm((PetscObject)(*t)._petsc), m, PETSC_DECIDE, M, out->M(), nullptr, &X);
-            MatCreateDense(PetscObjectComm((PetscObject)(*t)._petsc), m, PETSC_DECIDE, M, out->M(), nullptr, &Y);
+            MatCreateDense(PetscObjectComm((PetscObject)(*t)._petsc), m, PETSC_DECIDE, M, mu, nullptr, &X);
+            MatCreateDense(PetscObjectComm((PetscObject)(*t)._petsc), m, PETSC_DECIDE, M, mu, nullptr, &Y);
             MatDenseGetArrayWrite(X, &ptr);
-            for(int j = 0; j < out->M(); ++j) {
-              PetscScalar* in = p + j * u->N();
+            for(int j = 0; j < mu; ++j) {
+              PetscScalar* in = p + j * (*t)._A->getDof();
               PetscScalar* out = ptr + j * m;
               HPDDM::Subdomain< K >::template distributedVec< 0 >((*t)._num, (*t)._first, (*t)._last,
                                                                   in, out,
-                                                                  static_cast<PetscInt>(u->N()), 1);
+                                                                  static_cast<PetscInt>((*t)._A->getDof()), 1);
             }
             MatDenseRestoreArrayWrite(X, &ptr);
           }
@@ -5123,7 +5128,7 @@ namespace PETSc {
             PetscBool nonZero;
             KSPGetInitialGuessNonzero((*t)._ksp, &nonZero);
             if (nonZero) {
-              ffassert(out->M() == 1);
+              ffassert(mu == 1);
               VecGetArray(y, &ptr);
               p = reinterpret_cast<PetscScalar*>(out->operator upscaled_type<PetscScalar>*());
 #if !defined(PETSC_USE_REAL_DOUBLE)
@@ -5141,7 +5146,7 @@ namespace PETSc {
           }
           *out = K();
         } else {
-          ffassert(out->M() == 1);
+          ffassert(mu == 1);
           VecSet(x, PetscScalar( ));
           Vec isVec;
           VecCreateMPIWithArray(PETSC_COMM_SELF, 1, (*t)._A->getMatrix( )->HPDDM_n,
@@ -5171,11 +5176,11 @@ namespace PETSc {
           }
         }
         if (trans == 'N') {
-          if (out->M() == 1) KSPSolve((*t)._ksp, x, y);
+          if (mu == 1) KSPSolve((*t)._ksp, x, y);
           else KSPMatSolve((*t)._ksp, X, Y);
         }
         else {
-          if (out->M() == 1) {
+          if (mu == 1) {
             if (!std::is_same< PetscScalar, PetscReal >::value && t.conjugate) VecConjugate(x);
             KSPSolveTranspose((*t)._ksp, x, y);
             if (!std::is_same< PetscScalar, PetscReal >::value && t.conjugate) VecConjugate(y);
@@ -5233,7 +5238,7 @@ namespace PETSc {
         }
         else if (std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
                           HpSchwarz< PetscScalar > >::value) {
-          if (out->M() == 1) {
+          if (mu == 1) {
             VecGetArray(y, &ptr);
             if(isType)
               loopDistributedVec<1, 'N'>((*t)._petsc, (*t)._exchange, out, ptr);
@@ -5245,11 +5250,11 @@ namespace PETSc {
             PetscInt m;
             MatGetLocalSize((*t)._petsc, &m, nullptr);
             MatDenseGetArrayWrite(Y, &ptr);
-            for(int j = 0; j < out->M(); ++j) {
-              PetscScalar* in = p + j * u->N();
+            for(int j = 0; j < mu; ++j) {
+              PetscScalar* in = p + j * (*t)._A->getDof();
               PetscScalar* out = ptr + j * m;
               HPDDM::Subdomain< K >::template distributedVec< 1 >((*t)._num, (*t)._first, (*t)._last, in,
-                                                                  out, static_cast<PetscInt>(u->N()), 1);
+                                                                  out, static_cast<PetscInt>((*t)._A->getDof()), 1);
             }
             MatDenseRestoreArrayWrite(Y, &ptr);
             MatDestroy(&X);
@@ -5268,9 +5273,9 @@ namespace PETSc {
         if (std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
                           HpSchwarz< PetscScalar > >::value &&
             t.A->_A)
-          (*t)._A->exchange(p, out->M());
+          (*t)._A->exchange(p, mu);
         if(!std::is_same<PetscReal, upscaled_type<PetscReal>>::value) {
-          ffassert(out->M() == 1);
+          ffassert(mu == 1);
           for(int i = out->N() - 1; i >= 0; --i)
             out->operator[](i) = p[i];
           p = reinterpret_cast<PetscScalar*>(u->operator upscaled_type<PetscScalar>*());

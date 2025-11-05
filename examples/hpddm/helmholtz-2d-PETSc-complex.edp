@@ -65,3 +65,11 @@ for(int i = 0; i < M; ++i) {
     macro params()cmm = "Global solution #" + i, wait = 1, fill = 1, value = 1, dim = 3//
     plotMPI(Th, u, Pk, def, complex, params);
 }
+complex[int] C(B.n * B.m);
+C = A^-1 * RHS.asarray;
+for(int i = 0; i < M; ++i) {
+    u[] = B(:, i);
+    u[] -= C(i * Wh.ndof:(i + 1) * Wh.ndof - 1);
+    macro params()cmm = "Error #" + i, wait = 1, fill = 1, value = 1, dim = 3//
+    plotMPI(Th, u, Pk, def, complex, params);
+}
