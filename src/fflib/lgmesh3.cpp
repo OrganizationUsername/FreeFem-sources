@@ -1712,6 +1712,7 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
   MeshPoint *mps=MeshPointStack(s),mp=*mps;  
   pair<FEbase<R,v_fes> *,int>  pp=GetAny<pair<FEbase<R,v_fes> *,int> >((*ppfe)(s));
   FEbase<R,v_fes> & fe(*pp.first);
+  const FESpace &Vho = fe;
   const  FESpace & Vh(*fe.newVh());
   KN<R> gg(Vh.MaximalNbOfDF()); 
   const  Mesh & Th(Vh.Th);
@@ -1723,6 +1724,9 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
     {  cerr << " Try to set a  vectorial  FE function  (nb  componant=" <<  Vh.N << ") with one scalar " << endl;
        ExecError(" Error interploation (set)  FE function (vectorial) with a scalar");
     }
+  KN< R > *xx = fe.x(); // get array
+  bool change = !xx || (xx->N() != Vh.NbOfDF)|| &Vho != &Vh;
+
   KN<R> * y=new  KN<R>(Vh.NbOfDF);
   KN<R> & yy(*y);
   // interpoler
@@ -1774,7 +1778,11 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
 	}
     }
   *mps=mp;
-  fe=y;
+  if(change) fe = y;// change the array pointeur
+  else {
+      *fe.x() = yy;//  copy value in new value in old vector
+      delete y;
+  }
   kkff = Mesh::kfind - kkff;
   kkth = Mesh::kthrough -kkth;
   
@@ -1862,7 +1870,8 @@ AnyType E_set_fev3<K,v_fes>::operator()(Stack s)  const
   MeshPoint *mps=MeshPointStack(s), mp=*mps;   
   FEbase<K,v_fes> ** pp=GetAny< FEbase<K,v_fes> **>((*ppfe)(s));
   FEbase<K,v_fes> & fe(**pp);
-  const  FESpace & Vh(*fe.newVh());
+  const FESpace &Vho = fe;
+  const FESpace & Vh(*fe.newVh());
  // KN<K> gg(Vh.MaximalNbOfDF()); 
   
   const  Mesh & Th(Vh.Th); 
@@ -1889,7 +1898,9 @@ AnyType E_set_fev3<K,v_fes>::operator()(Stack s)  const
   ffassert( aa.size() == Vh.N);
   for (int i=0;i<dim;i++)
     tabexp[i]=aa[i]; 
-  
+  KN< K > *xx = fe.x(); // get array
+  bool change = !xx || (xx->N() != Vh.NbOfDF)|| &Vho != &Vh;
+
   KN<K> * y=new  KN<K>(Vh.NbOfDF);
   KN<K> & yy(*y);
   int npPh = Vh.maxNbPtforInterpolation;
@@ -1957,7 +1968,11 @@ AnyType E_set_fev3<K,v_fes>::operator()(Stack s)  const
 	   sptr->clean(); // modif FH mars 2006  clean Ptr          
 	 } 
     }
-  fe=y;
+  if(change) fe = y;// change the array pointeur
+  else {
+      *fe.x() = yy;//  copy value in new value in old vector
+      delete y;
+  }
   if (copt) delete [] copt;
   *MeshPointStack(s) = mp;
   if(verbosity>1)

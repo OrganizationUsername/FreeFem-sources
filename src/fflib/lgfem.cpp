@@ -2097,6 +2097,7 @@ AnyType set_fe(Stack s, Expression ppfe, Expression e) {
   MeshPoint *mps = MeshPointStack(s), mp = *mps;
   pair< FEbase< R, v_fes > *, int > pp = GetAny< pair< FEbase< R, v_fes > *, int > >((*ppfe)(s));
   FEbase< R, v_fes > &fe(*pp.first);
+  const FESpace &Vho = fe;
   const FESpace *pVh(fe.newVh( ));
 
   if (!pVh) ExecError("Unset FEspace (Null mesh ? ) on  uh= ");
@@ -2111,8 +2112,13 @@ AnyType set_fe(Stack s, Expression ppfe, Expression e) {
          << endl;
     ExecError(" Error interploation (set)  FE function (vectorial) with a scalar");
   }
-  KN< R > *y = new KN< R >(Vh.NbOfDF);
-  KN< R > &yy(*y);
+  KN< R > *xx = fe.x(); // get array
+  bool change = !xx || (xx->N() != Vh.NbOfDF)|| &Vho != pVh;
+  
+  KN< R > *y =  new KN< R >(Vh.NbOfDF) ; // alway change the result array to
+    // write   u = u*2; if same memory => bug !
+    // so new array F.H. 5/11/25
+  KN_< R > &yy(*y);
   KN< R > Viso(100);
   for (int i = 0; i < Viso.N( ); i++) Viso[i] = 0.01 * i;
 
@@ -2162,13 +2168,17 @@ AnyType set_fe(Stack s, Expression ppfe, Expression e) {
       sptr->clean( );    // modif FH mars 2006  clean Ptr
     }
   *mps = mp;
-  fe = y;
+  if(change) fe = y;// change the array pointeur
+  else {
+      *fe.x() = yy;//  copy value in new value in old vector
+      delete y;
+  }
   kkff = Mesh::kfind - kkff;
   kkth = Mesh::kthrough - kkth;
 
   if (verbosity > 1)
-    ShowBound(*y, cout) << " " << kkth << "/" << kkff << " =  "
-                        << double(kkth) / Max< double >(1., kkff) << endl;
+    ShowBound(*fe.x(), cout) << " " << kkth << "/" << kkff << " =  "
+                        << double(kkth) / Max< double >(1., kkff) << " change " << change << endl;
   return SetAny< FEbase< R, v_fes > * >(&fe);
 }
 AnyType set_feoX_1(Stack s, Expression ppfeX_1, Expression e) {    // inutile
@@ -2276,6 +2286,7 @@ AnyType E_set_fev< K >::Op2d(Stack s) const {
   MeshPoint *mps = MeshPointStack(s), mp = *mps;
   FEbase< K, v_fes > **pp = GetAny< FEbase< K, v_fes > ** >((*ppfe)(s));
   FEbase< K, v_fes > &fe(**pp);
+  const FESpace &Vho = fe;
   const FESpace &Vh(*fe.newVh( ));
   KN< K > gg(Vh.MaximalNbOfDF( ));
 
@@ -2301,6 +2312,8 @@ AnyType E_set_fev< K >::Op2d(Stack s) const {
   TabFuncArg tabexp(s, Vh.N);
   ffassert(aa.size( ) == Vh.N);
   for (int i = 0; i < dim; i++) tabexp[i] = aa[i];
+  KN< K > *xx = fe.x(); // get array
+  bool change = !xx || (xx->N() != Vh.NbOfDF)|| &Vho != &Vh;
 
   KN< K > *y = new KN< K >(Vh.NbOfDF);
   KN< K > &yy(*y);
@@ -2370,10 +2383,16 @@ AnyType E_set_fev< K >::Op2d(Stack s) const {
 
       for (int df = 0; df < nbdf; df++) yy[Kt(df)] = gg[df];
     }
-  fe = y;
+  if(change)
+    fe = y;
+  else {
+      *fe.x() = yy;//  copy value in new value in old vector
+      delete y;
+  }
+
   if (copt) delete[] copt;
   *MeshPointStack(s) = mp;
-  if (verbosity > 1) ShowBound(*y, cout) << endl;
+  if (verbosity > 1) ShowBound(*fe.x(), cout) << endl;
   return Nothing;
 }
 

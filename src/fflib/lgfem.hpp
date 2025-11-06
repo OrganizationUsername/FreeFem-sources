@@ -1196,7 +1196,7 @@ class E_F_StackF0F0opt2 : public E_F0mps {
 
 template< class R >
 inline ostream &ShowBound(const KN< R > &y, ostream &f) {
-  f << "  -- vector function's bound  " << y.min( ) << " " << y.max( );
+  f << "  -- vector function's bound  " << y.min( ) << " " << y.max( ) << " : "<< &y[0] << " N " << y.N() << " ";
   return f;
 }
 template<>
