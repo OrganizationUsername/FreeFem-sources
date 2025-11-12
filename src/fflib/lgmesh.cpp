@@ -550,7 +550,7 @@ AnyType Op_trunc_mesh::Op::operator()(Stack stack)  const {
 
      *mp=mps;
      if (verbosity>1)
-     cout << "  -- Trunc mesh: Nb of Triangle = " << kk << " label=" <<label <<endl;
+     cout << "  -- Trunc mesh(2d): Nb of Triangle = " << kk << " label=" <<label <<endl;
     Mesh  * pmsh = new Mesh(Th,split,false,label);
     if(renum)
         pmsh->renum();

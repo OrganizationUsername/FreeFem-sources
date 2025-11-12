@@ -97,7 +97,7 @@ void TestSameVertexMesh3(const Mesh3 &Th3, const double &hseuil, const R3 &Psup,
   for (int ii = 0; ii < Th3.nv; ii++) {
     const R3 r3vi(Th3.vertices[ii].x, Th3.vertices[ii].y, Th3.vertices[ii].z);
     const Vertex3 &vi(r3vi);
-    Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+    Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
 
     if (!pvi) {
       v[nv_t].x = vi.x;
@@ -130,7 +130,7 @@ void TestSameTetrahedraMesh3(const Mesh3 &Th3, const double &hseuil, const R3 &P
     for (int jj = 0; jj < 4; jj++) iv[jj] = Th3.operator( )(K[jj]);
 
     const R3 vi(K(PtHat));
-    Vertex3 *pvi = gtree_t->ToClose(vi, hseuil);
+    Vertex3 *pvi = gtree_t->ToClose(vi, hseuil,true);
 
     if (!pvi) {
       vt[nt_t].x = vi.x;
@@ -165,7 +165,7 @@ void TestSameTetrahedraMesh3(const Mesh3 &Th3, const double &hseuil, const R3 &P
     for (int jj = 0; jj < 4; jj++) iv[jj] = Th3.operator( )(K[jj]);
 
     const R3 vi(K(PtHat));
-    Vertex3 *pvi = gtree_t->ToClose(vi, hseuil);
+    Vertex3 *pvi = gtree_t->ToClose(vi, hseuil,true);
 
     if (!pvi) {
       vt[nt_t].x = vi.x;
@@ -198,7 +198,7 @@ void TestSameTriangleMesh3(const Mesh3 &Th3, const double &hseuil, const R3 &Psu
     for (int jj = 0; jj < 3; jj++) iv[jj] = Th3.operator( )(K[jj]);
 
     const R3 vi(K(PtHat));
-    Vertex3 *pvi = gtree_be->ToClose(vi, hseuil);
+    Vertex3 *pvi = gtree_be->ToClose(vi, hseuil,true);
 
     if (!pvi) {
       vbe[nbe_t].x = vi.x;
@@ -233,7 +233,7 @@ void TestSameTriangleMesh3(const Mesh3 &Th3, const double &hseuil, const R3 &Psu
     for (int jj = 0; jj < 3; jj++) iv[jj] = Th3.operator( )(K[jj]);
 
     const R3 vi(K(PtHat));
-    Vertex3 *pvi = gtree_be->ToClose(vi, hseuil);
+    Vertex3 *pvi = gtree_be->ToClose(vi, hseuil,true);
 
     if (!pvi) {
       vbe[nbe_t].x = vi.x;
@@ -614,7 +614,7 @@ Mesh3 *TestElementMesh3_patch(const Mesh3 &Th3) {
 
   for (int ii = 0; ii < Th3.nv; ii++) {
     const Vertex3 &vi(Th3.vertices[ii]);
-    Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+      Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
 
     if (!pvi) {
       v[nbv].x = vi.x;
@@ -1883,7 +1883,7 @@ Mesh3 *GluMesh3(listMesh3 const &lst) {
 
     for (int ii = 0; ii < Th3.nv; ii++) {
       const Vertex3 &vi(Th3.vertices[ii]);
-      Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+      Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
 
       if (!pvi) {
         v[nbv].x = vi.x;
@@ -1898,7 +1898,7 @@ Mesh3 *GluMesh3(listMesh3 const &lst) {
     for (int k = 0; k < Th3.nt; k++) {
       const Tet &K(Th3.elements[k]);
       int iv[4];
-      for (int i = 0; i < 4; i++) iv[i] = gtree->ToClose(K[i], hseuil) - v;
+      for (int i = 0; i < 4; i++) iv[i] = gtree->ToClose(K[i], hseuil,true) - v;
       (tt++)->set(v, iv, K.lab);
     }
   }
@@ -1926,7 +1926,7 @@ Mesh3 *GluMesh3(listMesh3 const &lst) {
       for (int i = 0; i < 3; i++) iv[i] = Th3.operator( )(K[i]);
 
       const Vertex3 vi(K(PtHat));
-      Vertex3 *pvi = gtree_be->ToClose(vi, hseuil_border);
+      Vertex3 *pvi = gtree_be->ToClose(vi, hseuil_border,true);
       if (!pvi) {
         becog[nbe].x = vi.x;
         becog[nbe].y = vi.y;
@@ -1936,7 +1936,7 @@ Mesh3 *GluMesh3(listMesh3 const &lst) {
 
         int igluv[3];
         for (int i = 0; i < 3; i++)
-          igluv[i] = gtree->ToClose(K[i], hseuil) - v;    // NumSom[iv[0]+nbv0];
+          igluv[i] = gtree->ToClose(K[i], hseuil,true) - v;    // NumSom[iv[0]+nbv0];
 
         (bb++)->set(v, igluv, K.lab);
       }
@@ -2124,7 +2124,7 @@ MeshS *GluMesh(listMeshT<MeshS> const &lst) {
         
         for (int ii = 0; ii < Th.nv; ii++) {
             const V &vi(Th(ii));
-            V *pvi = gtree->ToClose(vi, hseuil);
+            V *pvi = gtree->ToClose(vi, hseuil,true);
             if (!pvi) {
                 v[nbv].x = vi.x;
                 v[nbv].y = vi.y;
@@ -2156,7 +2156,7 @@ MeshS *GluMesh(listMeshT<MeshS> const &lst) {
             const T &K(Th[k]);
             const R3 r3vi(K(PtHat1));
             const V &vi(r3vi);
-            V *pvi = gtree_e->ToClose(vi, hseuil_border);
+            V *pvi = gtree_e->ToClose(vi, hseuil_border,true);
             if (!pvi) {
                 becog1[nbt].x = vi.x;
                 becog1[nbt].y = vi.y;
@@ -2166,7 +2166,7 @@ MeshS *GluMesh(listMeshT<MeshS> const &lst) {
                 
                 int igluv[T::nv];
                 for (int i = 0; i < (T::nv); i++)
-                    igluv[i] = gtree->ToClose(K[i], hseuil) - v;
+                    igluv[i] = gtree->ToClose(K[i], hseuil,true) - v;
                 (tt++)->set(v, igluv, K.lab);
             }
         }
@@ -2179,7 +2179,7 @@ MeshS *GluMesh(listMeshT<MeshS> const &lst) {
             
             const R3 r3vi(K(PtHat2));
             const V &vi(r3vi);
-            V *pvi = gtree_be->ToClose(vi, hseuil_border);
+            V *pvi = gtree_be->ToClose(vi, hseuil_border,true);
                 if (!pvi) {
                     becog2[nbe].x = vi.x;
                     becog2[nbe].y = vi.y;
@@ -2189,7 +2189,7 @@ MeshS *GluMesh(listMeshT<MeshS> const &lst) {
                     
                     int igluv[B::nv];
                     for (int i = 0; i < (B::nv); i++)
-                        igluv[i] = gtree->ToClose(K[i], hseuil) - v;
+                        igluv[i] = gtree->ToClose(K[i], hseuil,true) - v;
                     
                     (bb++)->set(v, igluv, K.lab);
                 }
@@ -2276,7 +2276,7 @@ MeshL *GluMesh(listMeshT<MeshL> const &lst) {
         
         for (int ii = 0; ii < Th.nv; ii++) {
             const V &vi(Th(ii));
-            V *pvi = gtree->ToClose(vi, hseuil);
+            V *pvi = gtree->ToClose(vi, hseuil,true);
             if (!pvi) {
                 v[nbv].x = vi.x;
                 v[nbv].y = vi.y;
@@ -2312,7 +2312,7 @@ MeshL *GluMesh(listMeshT<MeshL> const &lst) {
         
             const R3 r3vi(K(PtHat1));
             const V &vi(r3vi);
-            V *pvi = gtree_e->ToClose(vi, hseuil_border);
+            V *pvi = gtree_e->ToClose(vi, hseuil_border,true);
             if (!pvi) {
                 becog1[nbt].x = vi.x;
                 becog1[nbt].y = vi.y;
@@ -2322,7 +2322,7 @@ MeshL *GluMesh(listMeshT<MeshL> const &lst) {
                 
                 int igluv[T::nv];
                 for (int i = 0; i < 2/*T::nv*/; i++)
-                    igluv[i] = gtree->ToClose(K[i], hseuil) - v;
+                    igluv[i] = gtree->ToClose(K[i], hseuil,true) - v;
                 (tt++)->set(v, igluv, K.lab);
             }
         }
@@ -2334,7 +2334,7 @@ MeshL *GluMesh(listMeshT<MeshL> const &lst) {
             const B &K(Th.be(k));
             const V &vi(Th(Th.operator( )(K[0]) ));
          
-            V *pvi = gtree_be->ToClose(vi, hseuil_border);
+            V *pvi = gtree_be->ToClose(vi, hseuil_border,true);
             if (!pvi) {
                 becog2[nbe].x = vi.x;
                 becog2[nbe].y = vi.y;
@@ -2342,7 +2342,7 @@ MeshL *GluMesh(listMeshT<MeshL> const &lst) {
                 becog2[nbe].lab = vi.lab;
                 gtree_be->Add(becog2[nbe++]);
                 int igluv[B::nv];
-                igluv[0] = gtree->ToClose(K[0], hseuil) - v;
+                igluv[0] = gtree->ToClose(K[0], hseuil,true) - v;
                 (bb++)->set(v, igluv, K.lab);
             }
          }
@@ -4041,7 +4041,7 @@ void OrderVertexTransfo_hcode_nv_gtree(const int &tab_nv, const R3 &bmin, const 
   for (int ii = 0; ii < tab_nv; ii++) {
     const R3 r3vi(tab_XX[ii], tab_YY[ii], tab_ZZ[ii]);
     const Vertex3 &vi(r3vi);
-    Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+    Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
     if (!pvi) {
       v[nv_t].x = vi.x;
       v[nv_t].y = vi.y;
@@ -4116,7 +4116,7 @@ void PointCommun_hcode_gtree(const int &dim, const int &NbPoints, const int &poi
   for (int ii = 0; ii < NbPoints; ii++) {
     const R3 r3vi(Coord_Point[ii][0], Coord_Point[ii][1], Coord_Point[ii][2]);
     const Vertex3 &vi(r3vi);
-    Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+    Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
 
     if (!pvi) {
       v[np].x = vi.x;
@@ -4145,7 +4145,7 @@ void PointCommun_hcode_gtree(const int &dim, const int &NbPoints, const int &poi
       const R3 r3vi(Coord_Point[ii][0], Coord_Point[ii][1], Coord_Point[ii][2]);
       // int label =  label_point[ii];
       const Vertex3 &vi(r3vi);
-      Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+      Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
       ind_multiple[pvi - v] = ind_multiple[pvi - v] + 1;
     }
 
@@ -5348,7 +5348,7 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
         << newedge << " edge on border "<<  nbeb<< endl;
     
     
-    double hseuil = (hmin / kksplit) / 1000.;
+    double hseuil = (hmin / kksplit) / 10.;
     nbe = (nbeb+newedge)*kksplit;
     if (verbosity > 5)
         cout << "  - Before trunc, mesh has " << Th.nbe << " new  boundary edges, " << nbeb
@@ -5427,7 +5427,7 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
     // first build old point to keep the numbering order for DDM ...
     for (int i = 0, k = 0; i < Th.nv; i++) {
         if (takevertex[i] >= 0) {
-            Vertex3 *pvi = gtree->ToClose(Th(i), hseuil);
+            Vertex3 *pvi = gtree->ToClose(Th(i), hseuil,true);
             if (!pvi) {
                 (R3 &)vertices[np] = Th(i);
                 vertices[np].lab = Th(i).lab;
@@ -5451,7 +5451,7 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
             
             // new points
             for (int iv = 0; iv < nvsub; iv++) {
-                Vertex3 *pvi = gtree->ToClose(vertextrisub[iv], hseuil);
+                Vertex3 *pvi = gtree->ToClose(vertextrisub[iv], hseuil,true);
                 
                 if (!pvi) {
                     vertices[np].x = vertextrisub[iv].x;
@@ -5561,7 +5561,12 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
         
         for (int iv = 0; iv < nv1Dsub; iv++) {
             const Vertex3 &vi(vertexedgesub[iv]);
-            Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+            Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
+            if( ! pvi ) {
+                cout << " bug !!!" << endl;
+                cout << iv << " " << vi << " " << vertex1Dsub[iv].x << " "<< ivv[0] << " " << ivv[1] << endl;
+                ffassert(pvi);
+            }
             assert(pvi);
             newindex[iv] = pvi - vertices;
         }
@@ -5651,7 +5656,7 @@ AnyType Op_trunc_meshS::Op::operator( )(Stack stack) const {
           
           // *mp=mps;
     if (verbosity > 1) {
-        cout << "  -- Trunc mesh: Nb of Surface Triangles = " << kk << " label=" << label << endl;
+        cout << "  -- Trunc meshS: Nb of Surface Triangles = " << kk << " label=" << label << endl;
     }
           
     if (pn2o) {
@@ -5803,7 +5808,7 @@ MeshL *truncmesh(const MeshL &Th, const long &kksplit, int *split, bool WithMort
     }
   }
 
-  double hseuil = (hmin / kksplit) / 1000.;
+  double hseuil = (hmin / kksplit) / 10.;
   if (verbosity > 5)
     cout << "Before trunc hseuil=" << hseuil << endl;
 
@@ -5868,7 +5873,7 @@ MeshL *truncmesh(const MeshL &Th, const long &kksplit, int *split, bool WithMort
   // first build old point to keep the numbering order for DDM ...
   for (int i = 0, k = 0; i < Th.nv; i++) {
     if (takevertex[i] >= 0) {
-      V *pvi = gtree->ToClose(Th(i), hseuil);
+      V *pvi = gtree->ToClose(Th(i), hseuil,true);
       if (!pvi) {
         (R3 &)vertices[np] = Th(i);
         vertices[np].lab = Th(i).lab;
@@ -5894,7 +5899,7 @@ MeshL *truncmesh(const MeshL &Th, const long &kksplit, int *split, bool WithMort
 
       // new points
       for (int iv = 0; iv < nvsub; iv++) {
-        V *pvi = gtree->ToClose(vertexedgesub[iv], hseuil);
+        V *pvi = gtree->ToClose(vertexedgesub[iv], hseuil,true);
 
         if (!pvi) {
           vertices[np].x = vertexedgesub[iv].x;
@@ -5996,7 +6001,7 @@ AnyType Op_trunc_meshL::Op::operator( )(Stack stack) const {
 
   // *mp=mps;
   if (verbosity > 1) {
-    cout << "  -- Trunc mesh: Nb of line Edges = " << kk << " label=" << label << endl;
+    cout << "  -- Trunc meshL: Nb of line Edges = " << kk << " label=" << label << endl;
   }
 
   if (pn2o) {
@@ -6177,7 +6182,7 @@ Mesh3 *truncmesh(const Mesh3 &Th, const long &kksplit, int *split, bool kk, cons
 
   ffassert(nbfi % 2 == 0);
   nface = nbeee + nbfi / 2;
-  double hseuil = (hmin / kksplit) / 1000.;
+  double hseuil = (hmin / kksplit) / 10.;
   if (verbosity > 5) {
     cout << "  number of  not intern boundary faces = " << nbeee << ",  all faces  =  " << nbe
          << ", hseuil=" << hseuil << endl;
@@ -6293,7 +6298,7 @@ Mesh3 *truncmesh(const Mesh3 &Th, const long &kksplit, int *split, bool kk, cons
     if (takevertex[i] >= 0) {
       double heps = hseuil;
       for (int j = 0; j < 3; ++j) {
-        Vertex3 *pvi = gtree->ToClose(Th(i), heps);
+        Vertex3 *pvi = gtree->ToClose(Th(i), heps,true);
         if (!pvi) {
           (R3 &)v[np] = Th(i);
           v[np].lab = Th(i).lab;
@@ -6650,7 +6655,7 @@ AnyType Op_trunc_mesh3::Op::operator( )(Stack stack) const {
 
   // *mp=mps;
   if (verbosity > 1) {
-    cout << "  -- Trunc mesh: Nb of Tetrahedrons = " << kk << " label=" << label << endl;
+    cout << "  -- Trunc mesh3: Nb of Tetrahedrons = " << kk << " label=" << label << endl;
   }
 
   Mesh3 *Tht = truncmesh(Th, kkksplit, split, false, label, precis_mesh, orientation, cleanmesh, removeduplicate);
@@ -7289,7 +7294,7 @@ Mesh3 *GluMesh3tab(KN< pmesh3 > *const &tab, long const &lab_delete, bool const 
 
       for (int ii = 0; ii < Th3.nv; ii++) {
         const Vertex3 &vi(Th3.vertices[ii]);
-        Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+        Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
 
         if (!pvi) {
           v[nbv].x = vi.x;
@@ -7304,7 +7309,7 @@ Mesh3 *GluMesh3tab(KN< pmesh3 > *const &tab, long const &lab_delete, bool const 
       for (int k = 0; k < Th3.nt; k++) {
         const Tet &K(Th3.elements[k]);
         int iv[Tet::nea];
-        for (int iea = 0; iea < Tet::nea; iea++) iv[iea] = gtree->ToClose(K[iea], hseuil) - v;
+        for (int iea = 0; iea < Tet::nea; iea++) iv[iea] = gtree->ToClose(K[iea], hseuil,true) - v;
 
         (t++)->set(v, iv, K.lab);
       }
@@ -7329,7 +7334,7 @@ Mesh3 *GluMesh3tab(KN< pmesh3 > *const &tab, long const &lab_delete, bool const 
           for (int ii = 0; ii < 3; ii++) iv[ii] = Th3.operator( )(K[ii]);
 
           const Vertex3 &vi(K(PtHat));
-          Vertex3 *pvi = gtree_be->ToClose(vi, hseuil_border);
+          Vertex3 *pvi = gtree_be->ToClose(vi, hseuil_border,true);
           if (!pvi) {
             becog[nbe].x = vi.x;
             becog[nbe].y = vi.y;
@@ -7338,7 +7343,7 @@ Mesh3 *GluMesh3tab(KN< pmesh3 > *const &tab, long const &lab_delete, bool const 
             gtree_be->Add(becog[nbe++]);
 
             int igluv[3];
-            for (int i = 0; i < 3; i++) igluv[i] = gtree->ToClose(K[i], hseuil) - v;
+            for (int i = 0; i < 3; i++) igluv[i] = gtree->ToClose(K[i], hseuil,true) - v;
 
             (bb++)->set(v, igluv, K.lab);
           }
@@ -7377,7 +7382,7 @@ Mesh3 *GluMesh3tab(KN< pmesh3 > *const &tab, long const &lab_delete, bool const 
         for (int p = 0; p < 3; p++) {
           const int iv = Th3.operator()(K[p]);
           const Vertex3 &vi(Th3.vertices[iv]);
-          Vertex3 *pvi = gtree->ToClose(vi, hseuil);
+          Vertex3 *pvi = gtree->ToClose(vi, hseuil,true);
           if (!pvi) {
             v[nbv].x = vi.x;
             v[nbv].y = vi.y;
