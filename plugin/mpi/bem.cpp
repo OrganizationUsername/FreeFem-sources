@@ -557,7 +557,6 @@ AnyType SetHMatrix_Op<R>::operator()(Stack stack) const
     Data_Bem_Solver ds;
     SetEnd_Data_Bem_Solver<R>(stack,ds,nargs,OpCall_FormBilinear_np::n_name_param);
     (*A)->solver = ds.solver;
-    cout << (*A)->solver << endl;
     if (ds.factorize && (ds.solver == "HLU"))
         (*A)->factorization();
 
@@ -582,6 +581,7 @@ void addHmat() {
     TheOperators->Add("=", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K>>(Prod<KN<K>*, K>::mv));
     TheOperators->Add("<-", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K>>(Prod<KN<K>*, K>::init));
 
+    SetHMatrix_Op<K>::btype = Dcl_Type<const  SetHMatrix_Op<K> * >();
     Global.Add("set","(",new SetHMatrix<K>);
 
     Add<HMatrixVirt<K>**>("n",".",new OneOperator1<long,HMatrixVirt<K>**>(get_hmat_n<K>));
