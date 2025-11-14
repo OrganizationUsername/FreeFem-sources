@@ -51,7 +51,7 @@ jobs:
 
       - name: Check
         run: |
-          make check -i
+          make check
           echo "Tests failed: " $(grep :test-result examples/*/*.trs | grep FAIL | wc -l)
           ./etc/actions/failed_tests_logs.sh
 
@@ -89,7 +89,7 @@ jobs:
 
       - name: Check
         run: |
-          make check -i
+          make check
           echo "Tests failed: " $(grep :test-result examples/*/*.trs | grep FAIL | wc -l)
           ./etc/actions/failed_tests_logs.sh
 
@@ -146,6 +146,6 @@ jobs:
 
       - name: Check
         run: |
-          make check -i
+          make check
           echo "Tests failed: " $(grep :test-result examples/*/*.trs | grep FAIL | wc -l)
           ./etc/actions/failed_tests_logs.sh
