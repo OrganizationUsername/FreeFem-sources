@@ -1712,7 +1712,7 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
   MeshPoint *mps=MeshPointStack(s),mp=*mps;  
   pair<FEbase<R,v_fes> *,int>  pp=GetAny<pair<FEbase<R,v_fes> *,int> >((*ppfe)(s));
   FEbase<R,v_fes> & fe(*pp.first);
-  const FESpace &Vho = fe;
+  const FESpace *pVho = fe.Vh;
   const  FESpace & Vh(*fe.newVh());
   KN<R> gg(Vh.MaximalNbOfDF()); 
   const  Mesh & Th(Vh.Th);
@@ -1725,7 +1725,7 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
        ExecError(" Error interploation (set)  FE function (vectorial) with a scalar");
     }
   KN< R > *xx = fe.x(); // get array
-  bool change = !xx || (xx->N() != Vh.NbOfDF)|| &Vho != &Vh;
+    bool change = !xx || (xx->N() != Vh.NbOfDF)|| (pVho && pVho != &Vh);
 
   KN<R> * y=new  KN<R>(Vh.NbOfDF);
   KN<R> & yy(*y);
@@ -1870,7 +1870,7 @@ AnyType E_set_fev3<K,v_fes>::operator()(Stack s)  const
   MeshPoint *mps=MeshPointStack(s), mp=*mps;   
   FEbase<K,v_fes> ** pp=GetAny< FEbase<K,v_fes> **>((*ppfe)(s));
   FEbase<K,v_fes> & fe(**pp);
-  const FESpace &Vho = fe;
+  const FESpace *pVho = fe.Vh;
   const FESpace & Vh(*fe.newVh());
  // KN<K> gg(Vh.MaximalNbOfDF()); 
   
@@ -1899,7 +1899,7 @@ AnyType E_set_fev3<K,v_fes>::operator()(Stack s)  const
   for (int i=0;i<dim;i++)
     tabexp[i]=aa[i]; 
   KN< K > *xx = fe.x(); // get array
-  bool change = !xx || (xx->N() != Vh.NbOfDF)|| &Vho != &Vh;
+    bool change = !xx || (xx->N() != Vh.NbOfDF)|| (pVho && pVho != &Vh);
 
   KN<K> * y=new  KN<K>(Vh.NbOfDF);
   KN<K> & yy(*y);

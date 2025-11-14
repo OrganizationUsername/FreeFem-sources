@@ -2097,7 +2097,7 @@ AnyType set_fe(Stack s, Expression ppfe, Expression e) {
   MeshPoint *mps = MeshPointStack(s), mp = *mps;
   pair< FEbase< R, v_fes > *, int > pp = GetAny< pair< FEbase< R, v_fes > *, int > >((*ppfe)(s));
   FEbase< R, v_fes > &fe(*pp.first);
-  const FESpace &Vho = fe;
+  const FESpace *pVho = fe.Vh;
   const FESpace *pVh(fe.newVh( ));
 
   if (!pVh) ExecError("Unset FEspace (Null mesh ? ) on  uh= ");
@@ -2113,7 +2113,7 @@ AnyType set_fe(Stack s, Expression ppfe, Expression e) {
     ExecError(" Error interploation (set)  FE function (vectorial) with a scalar");
   }
   KN< R > *xx = fe.x(); // get array
-  bool change = !xx || (xx->N() != Vh.NbOfDF)|| &Vho != pVh;
+  bool change = !xx || (xx->N() != Vh.NbOfDF)|| (pVho && pVho != pVh);
   
   KN< R > *y =  new KN< R >(Vh.NbOfDF) ; // alway change the result array to
     // write   u = u*2; if same memory => bug !
@@ -2286,7 +2286,7 @@ AnyType E_set_fev< K >::Op2d(Stack s) const {
   MeshPoint *mps = MeshPointStack(s), mp = *mps;
   FEbase< K, v_fes > **pp = GetAny< FEbase< K, v_fes > ** >((*ppfe)(s));
   FEbase< K, v_fes > &fe(**pp);
-  const FESpace &Vho = fe;
+  const FESpace *pVho = fe.Vh;
   const FESpace &Vh(*fe.newVh( ));
   KN< K > gg(Vh.MaximalNbOfDF( ));
 
@@ -2313,7 +2313,7 @@ AnyType E_set_fev< K >::Op2d(Stack s) const {
   ffassert(aa.size( ) == Vh.N);
   for (int i = 0; i < dim; i++) tabexp[i] = aa[i];
   KN< K > *xx = fe.x(); // get array
-  bool change = !xx || (xx->N() != Vh.NbOfDF)|| &Vho != &Vh;
+    bool change = !xx || (xx->N() != Vh.NbOfDF)|| (pVho && pVho != &Vh);
 
   KN< K > *y = new KN< K >(Vh.NbOfDF);
   KN< K > &yy(*y);

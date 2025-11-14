@@ -1231,10 +1231,10 @@ void GenericMesh<T,B,V>::VertexInElement(V *vertice, T *list, int &nv, int *(&in
     
     // new map and list vertices after clean multiple elements
 
-    int map[nv];
-    int indv[nv];
+    KN<int> map(nv);
+    KN<int> indv(nv);
   
-    int takev[nv], takenewv[nv] ;
+    KN<int> takev(nv), takenewv(nv) ;
     for (int i=0;i<nv;i++) {
         indv[i]=-1;
         map[i]=i; // identidy by default

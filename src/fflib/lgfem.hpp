@@ -906,7 +906,7 @@ class FEbase {
   }
 
   operator FESpace &( ) {
-    throwassert(Vh);
+    ffassert(Vh);
     return *Vh;
   }
 
