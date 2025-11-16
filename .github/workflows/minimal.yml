@@ -5,7 +5,6 @@ on:
     branches:
       - develop
       - master
-      - slegrand-actions-debug
 
   pull_request:
     branches:
@@ -49,8 +48,7 @@ jobs:
 
       - name: Check
         run: |
-          make check
-          echo "Tests failed: " $(grep :test-result examples/*/*.trs | grep FAIL | wc -l)
+          make check -i
           ./etc/actions/failed_tests_logs.sh
 
       - name: Install
@@ -88,8 +86,7 @@ jobs:
 
       - name: Check
         run: |
-          make check
-          echo "Tests failed: " $(grep :test-result examples/*/*.trs | grep FAIL | wc -l)
+          make check -i
           ./etc/actions/failed_tests_logs.sh
 
       - name: Install
@@ -139,6 +136,5 @@ jobs:
 
       - name: Check
         run: |
-          make check
-          echo "Tests failed: " $(grep :test-result examples/*/*.trs | grep FAIL | wc -l)
+          make check -i
           ./etc/actions/failed_tests_logs.sh
