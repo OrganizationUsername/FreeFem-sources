@@ -40,8 +40,8 @@ SERVER=https://gforge.inria.fr/frs/download.php/file/34099
 #https://gforge.inria.fr/frs/download.php/file/34099/scotch_6.0.4.tar.gz
 #https://gforge.inria.fr/frs/download.php/23391
 INSTALL=../..
-scotch_VERSION=7.0.10
-scotch_VERSION_LOCAL=7.0.10
+scotch_VERSION=6.1.0
+scotch_VERSION_LOCAL=6.1.0
 #  trick to no in MPI on NOT .. 
 NOTESTMPI= test -z "$(CCP)"
 scotch: FAIRE
