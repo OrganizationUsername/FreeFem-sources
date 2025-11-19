@@ -7,11 +7,11 @@ folder: 3d
 ## Build a 3d mesh with a fissure, check eps in trunc check mesh
 We begin with a crack in a circle
 ~~~freefem
-real theta = 1*pi/180.; // 0.7 degree  limit to build the 2d mesh if no refinement in zero
+real theta = 1*pi/180.; // 1 degree limit to build the 2d mesh if no refinement in zero
 real xt = cos(theta),yt=sin(theta);
 cout << xt << " " << yt << endl;
 border C(t=theta, 2*pi-theta) { x = cos(t); y=sin(t); label=1;}
-border Ss(t=0,1;i){ t= t; x= t*xt; y = t*yt;if(i) y = -y; label=2+i;}
+border Ss(tt=0,1;i){ real t=tt^0.8; x= t*xt; y = t*yt;if(i) y = -y; label=2+i;} // parametrisation with tt^0.8 means less points close to 0
 real hs = 0.05;
 int nC = (2*pi-2*theta)/hs;
 int ns = (1./hs)/1;//   
