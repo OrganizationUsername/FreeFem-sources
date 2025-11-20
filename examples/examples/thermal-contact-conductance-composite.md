@@ -17,9 +17,9 @@ $$   k \frac{\partial u}{\partial n} = c[u] = u_{left} - u_{right} $$
 where $n$ is the normal to $\Gamma$ (oriented : left to right) and $ [u] $ is the jump of $u$ across $\Gamma$ with the correct sign. 
 ~~~freefem
 
-include "getARGV.idp"
+//include "getARGV.idp"
 // Version with composite space  
-bool nonconformcase = getARGV("-nc",0);  
+bool nonconformcase = 0;//getARGV("-nc",0); // bug under windows bizarre
 real x0=0,x2=4;
 real y0=0,y1=1;
 real L= x2-x0; 
