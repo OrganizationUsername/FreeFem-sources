@@ -1,6 +1,7 @@
 load "Element_P2pnc_3d"
 load "tetgen"
 load "medit"
+int smesh=0;
 int err=0;
 int cas1=0;  //0 need Th1.mesh ... 
 macro DoFi(d,u,vf,p) ((d==12) ? int3d(Th)((u)/volume) : int2d(Th,d/3,qforder=6)((u)*l[vf(d/3,p[d]%3)]/area)) //
@@ -111,7 +112,7 @@ load "Element_P2pnc"
 
 real[int] xx=[0,1,0,0], yy=[0,0,1,0], zz=[0,0,0,1]; 
 mesh3 Th=tetgconvexhull(xx,yy,zz,region=1,label=3);
-savemesh(Th,"/tmp/Th.mesh");
+if(smesh) savemesh(Th,"Th.mesh");
 
 assert(Th.nbe==4);
 int [int] plab=[0,2,3,1];
@@ -126,7 +127,7 @@ for(int f=0; f<Th.nbe;++f)
 	
 }
 Th=change(Th,flabel=plab[nuFace]);
-savemesh(Th,"/tmp/Th2.mesh");
+if(smesh) savemesh(Th,"Th2.mesh");
 buildp(Th,0,p,vf);
 verifp(Th,0,p,vf);
 
