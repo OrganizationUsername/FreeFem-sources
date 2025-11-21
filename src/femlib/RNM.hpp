@@ -1050,9 +1050,9 @@ class KN :public KN_<R> { public:
    KN& operator =(const typename RNM_VirtualMatrix<R>::plusAx & Ax)
         { if(this->unset() && Ax.A && Ax.A->N ) this->set(new R[Ax.A->N],Ax.A->N); if(Ax.A) KN_<R>::operator=(Ax);return *this;}
    KN& operator =(const typename RNM_VirtualMatrix<R>::solveAxeqb & Ab)
-        { if(this->unset()) this->set(new R[Ab.b.N()],Ab.b.N());KN_<R>::operator=(Ab);return *this;}
+        { if(this->unset()) {this->set(new R[Ab.b.N()],Ab.b.N()); KN_<R>::operator=(R());} KN_<R>::operator=(Ab);return *this;}
     KN& operator =(const typename RNM_VirtualMatrix<R>::solveAtxeqb & Ab)
-    { if(this->unset()) this->set(new R[Ab.b.N()],Ab.b.N());KN_<R>::operator=(Ab);return *this;}
+    { if(this->unset()) {this->set(new R[Ab.b.N()],Ab.b.N()); ; KN_<R>::operator=(R());} KN_<R>::operator=(Ab);return *this;}
   KN& operator +=(const typename  RNM_VirtualMatrix<R>::plusAx & Ax)
   { if(this->unset()  && Ax.A->N) {
         this->set(new R[Ax.A->N],Ax.A->N);
