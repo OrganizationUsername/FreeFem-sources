@@ -3233,7 +3233,7 @@ void OneWindow::PlotValue(const KN_<double> & Viso,int  k0,const char * cmm)
     R dx=(xmax-xmin);
     R dy=(ymax-ymin);
     //  10 points
-    R h=10*kscreenscale;
+    R h=14*kscreenscale;
     if( kscreenscale==2) h = 24;// BofBof F.H
     R ho=h*1.1;
     R x0=xmin+dx*0.85;
@@ -3246,14 +3246,14 @@ void OneWindow::PlotValue(const KN_<double> & Viso,int  k0,const char * cmm)
     this->color(1);
 
     plot(x0+ho,y,cmm);
-    y -=  ho;
+    y -=  ho*2;
     for (int i=0;i<Viso.N();i++)
     {
         if((debug > 10)) cout << " x0 : " << x0<< " " << y << " " << h << " v = " << Viso[i] << endl;
         this->color(i+4);
         FillRectRasterPos(x0,y,x0+h,y+h);
         plot(x0+ho,y+3*h/10,Viso[i]);
-        y -=  ho;
+        y -=  h;
         ;
     }
     ShowGlerror("PlotValue f");
