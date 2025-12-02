@@ -3893,9 +3893,11 @@ namespace PETSc {
           ffassert(mList->n == mList->nnz);
           ffassert(mList->m == n);
           L = new HPDDM::MatrixCSR< void >(mList->n, n, mList->n, mList->p, mList->j, false);
-          ptA->_D = new KN<PetscReal>(mList->n);
-          for (int i = 0; i < mList->n; ++i) ptA->_D->operator[](i) = ptB->_A->getScaling()[mList->j[i]];
-          empty = new KN< double >(n, (double*)(ptB->_A->getScaling()));
+          if (ptB->_A->getScaling()) {
+            ptA->_D = new KN<PetscReal>(mList->n);
+            for (int i = 0; i < mList->n; ++i) ptA->_D->operator[](i) = ptB->_A->getScaling()[mList->j[i]];
+            empty = new KN< double >(n, (double*)(ptB->_A->getScaling()));
+          } else empty = new KN< double >(n, 1.0);
         } else {
           L = new HPDDM::MatrixCSR< void >(0, n, 0, nullptr, nullptr, false);
           empty = new KN< double >(0);
