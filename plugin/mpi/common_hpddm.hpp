@@ -54,7 +54,7 @@
 
 #include <HPDDM.hpp>
 
-#ifdef HPDDM_HPP_
+#if !defined(_HPDDM_)
 #define HPDDM_n n_
 #define HPDDM_m m_
 #define HPDDM_sym sym_
@@ -66,9 +66,6 @@
 #define HPDDM_dof dof_
 #define HPDDM_numbering numbering_
 #else
-#ifndef _HPDDM_
-#error "This should never happen"
-#endif
 #define HPDDM_n _n
 #define HPDDM_m _m
 #define HPDDM_sym _sym
