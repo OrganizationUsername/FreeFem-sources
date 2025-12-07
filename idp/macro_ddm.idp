@@ -149,6 +149,7 @@ IFMACRO(!privateCreateMat)
         else
             neighbors = trunc(globalName, suppSmooth > 0.001 && suppSmooth < 0.999, new2old = n2o);
         Unique(part[], intersection[0], remove = constant);
+        if(suppSmooth[].max < 0.01) intersection[0].resize(0);
         if(s > 1 && level <= 1) {
             globalName = trunc(globalName, suppSmooth > 0.001, split = s);
             supp = abs(part - constant) < 0.1;
@@ -158,7 +159,7 @@ IFMACRO(!privateCreateMat)
     }
     int[int] n2oGlobalPrivate, n2oNeighbor;
 IFMACRO(!privateDmesh#CartesianPartitioning)
-    globalName = trunc(globalName, suppSmooth > 0.001, label = 9999, new2old = n2oGlobalPrivate);
+    if(suppSmooth[].max > 0.01) globalName = trunc(globalName, suppSmooth > 0.001, label = 9999, new2old = n2oGlobalPrivate);
 ENDIFMACRO
     real eps = globalName.measure;
     real[int] epsTab(intersection[0].n);
@@ -173,7 +174,7 @@ ENDIFMACRO
         epsTab = 1.0e+30;
     suppSmooth = suppSmooth;
 IFMACRO(!privateDmesh#N2O)
-    meshName[level - 1] = trunc(globalName, suppSmooth > 0.501, label = fakeInterface, new2old = n2oNeighbor);
+    if(suppSmooth[].max > 0.01) meshName[level - 1] = trunc(globalName, suppSmooth > 0.501, label = fakeInterface, new2old = n2oNeighbor);
 IFMACRO(privateDmesh#CartesianPartitioning)
     real[int] bb(2 * dimension);
     boundingbox(meshName[level - 1], bb);
@@ -269,7 +270,7 @@ ENDIFMACRO
         part = part;
     n2oGlobalPrivate.resize(0);
     int numberIntersection = 0;
-    {
+    if(suppSmooth[].max > 0.01) {
         int[int] restriction = restrict(VhLocalPrivate, VhGlobalPrivate, n2oNeighbor);
         n2oNeighbor.resize(0);
         mpiWaitAll(rq);
