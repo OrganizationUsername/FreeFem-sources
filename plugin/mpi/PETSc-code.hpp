@@ -3923,29 +3923,42 @@ namespace PETSc {
             delete dA;
       }
       delete empty;
-      if (c == 1) {
-        MatSetType(ptA->_petsc, MATSHELL);
-        User< LinearSolver< Dmat > > user = nullptr;
-        PetscNew(&user);
-        user->op = nullptr;
-        const Polymorphic* op = nargs[0] ? dynamic_cast< const Polymorphic* >(nargs[0]) : nullptr;
-        if(op) {
-            const OneOperator* codeAt = op->Find("(", ArrayOfaType(atype< KN< PetscScalar >* >( ), false));
-            if (codeAt) {
-              user->op = new LinearSolver< Dmat >::MatF_O(ptB->_last - ptB->_first, stack, codeA, -1, codeAt);
-              MatShellSetOperation(ptA->_petsc, MATOP_MULT_TRANSPOSE,
-                      (PetscErrorCodeFn *)Op_User< LinearSolver< Mat >, Mat, 'T' >);
-            }
-        }
-        if(!user->op) user->op = new LinearSolver< Dmat >::MatF_O(ptB->_last - ptB->_first, stack, codeA);
-        MatShellSetContext(ptA->_petsc, user);
-        MatShellSetOperation(ptA->_petsc, MATOP_MULT,
-                             (PetscErrorCodeFn *)Op_User< LinearSolver< Mat >, Mat >);
-        MatShellSetOperation(ptA->_petsc, MATOP_DESTROY, (PetscErrorCodeFn *)ShellDestroy< LinearSolver< Dmat >  >);
-        MatSetUp(ptA->_petsc);
+    } else if (ptB->_petsc) {
+      if (c != 1) {
+        PetscBool assembled;
+
+        MatAssembled(ptB->_petsc, &assembled);
+        MatDuplicate(ptB->_petsc, assembled ? MAT_COPY_VALUES : MAT_DO_NOT_COPY_VALUES, &ptA->_petsc);
+      } else {
+        PetscInt m, M, n, N;
+
+        MatGetLocalSize(ptB->_petsc, &m, &n);
+        MatGetSize(ptB->_petsc, &M, &N);
+        MatCreate(PetscObjectComm((PetscObject)ptB->_petsc), &ptA->_petsc);
+        MatSetSizes(ptA->_petsc, m, n, M, N);
       }
-    } else if(ptB->_petsc) {
-      MatDuplicate(ptB->_petsc, MAT_COPY_VALUES, &ptA->_petsc);
+    }
+    if (c == 1) {
+      ffassert(ptA->_petsc);
+      MatSetType(ptA->_petsc, MATSHELL);
+      User< LinearSolver< Dmat > > user = nullptr;
+      PetscNew(&user);
+      user->op = nullptr;
+      const Polymorphic* op = nargs[0] ? dynamic_cast< const Polymorphic* >(nargs[0]) : nullptr;
+      if(op) {
+          const OneOperator* codeAt = op->Find("(", ArrayOfaType(atype< KN< PetscScalar >* >( ), false));
+          if (codeAt) {
+            user->op = new LinearSolver< Dmat >::MatF_O(ptB->_last - ptB->_first, stack, codeA, -1, codeAt);
+            MatShellSetOperation(ptA->_petsc, MATOP_MULT_TRANSPOSE,
+                    (PetscErrorCodeFn *)Op_User< LinearSolver< Mat >, Mat, 'T' >);
+          }
+      }
+      if(!user->op) user->op = new LinearSolver< Dmat >::MatF_O(ptB->_last - ptB->_first, stack, codeA);
+      MatShellSetContext(ptA->_petsc, user);
+      MatShellSetOperation(ptA->_petsc, MATOP_MULT,
+                           (PetscErrorCodeFn *)Op_User< LinearSolver< Mat >, Mat >);
+      MatShellSetOperation(ptA->_petsc, MATOP_DESTROY, (PetscErrorCodeFn *)ShellDestroy< LinearSolver< Dmat >  >);
+      MatSetUp(ptA->_petsc);
     }
     if (c == 0 && nargs[0] && GetAny< bool >((*nargs[0])(stack))) ptK->destroy( );
     return ptA;
