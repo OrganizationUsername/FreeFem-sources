@@ -1345,7 +1345,7 @@ void GenericMesh<T,B,V>::SameVertex(const double precis_mesh, V *vertice, T *ele
             cout << "    hmin =" << hmin << endl;
         }
 
-        assert(hmin < longmini_box);
+        assert(hmin <= longmini_box);
         if (verbosity > 5)
             cout << "    Norme2(bmin-bmax)=" << Norme2(bmin - bmax) << endl;
     
