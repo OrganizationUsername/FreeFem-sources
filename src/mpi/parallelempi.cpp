@@ -966,18 +966,26 @@ long MPIrank::Send (const Fem2D::Mesh3 *  a) const {
 long MPIrank::Send (const Fem2D::MeshS *  a) const {
     if(verbosity>100)
       cout << " MPI << (meshS *) " << a << endl;
-    ffassert(a);
-    SendWMeshd<MeshS> *rwm= new SendWMeshd<MeshS>(this,&a);
-    if( rwm->DoSR() ) delete rwm;
+    if(a) {
+      SendWMeshd<MeshS> *rwm= new SendWMeshd<MeshS>(this,&a);
+      if( rwm->DoSR() ) delete rwm;
+    }
+    else {
+      WSend((char*)NULL, 0, who, MPI_TAG<Fem2D::MeshS*>::TAG, comm, rq);
+    }
     return MPI_SUCCESS;
   }
 
 long MPIrank::Send (const Fem2D::MeshL *  a) const {
   if(verbosity>100)
     cout << " MPI << (meshL *) " << a << endl;
-  ffassert(a);
-  SendWMeshd<MeshL> *rwm= new SendWMeshd<MeshL>(this,&a);
-  if( rwm->DoSR() ) delete rwm;
+  if (a) {
+    SendWMeshd<MeshL> *rwm= new SendWMeshd<MeshL>(this,&a);
+    if( rwm->DoSR() ) delete rwm;
+  }
+  else {
+    WSend((char*)NULL, 0, who, MPI_TAG<Fem2D::MeshL*>::TAG, comm, rq);
+  }
   return MPI_SUCCESS;
 }
 
