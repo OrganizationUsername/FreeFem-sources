@@ -108,6 +108,7 @@ void setVectorSchur(Type* ptA, KN<Tab>* const& mT, KN<double>* const& pL) {
     PetscInt* num;
     PetscInt start, end;
     long long global;
+    ffassert(ptA->_A);
     ptA->_A->clearBuffer();
     globalMapping(ptA->_A, num, start, end, global, re);
     delete [] re;
