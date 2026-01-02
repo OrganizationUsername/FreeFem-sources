@@ -915,6 +915,10 @@ namespace PETSc {
               MatSetSizes(ptA->_petsc, ptA->_last - ptA->_first, ptA->_last - ptA->_first,
                           PETSC_DECIDE, PETSC_DECIDE);
             }
+            if (ptA->_exchange) {
+              if (ptA->_exchange[0]) ffassert(ptA->_exchange[0]->getDof() == mN->n);
+              if (ptA->_exchange[1]) ffassert(ptA->_exchange[1]->getDof() == mN->m);
+            }
             if (ptA->_A && ptA->_A->getMatrix( )->HPDDM_sym) {
               MatSetType(ptA->_petsc, MATSBAIJ);
               MatSetUp(ptA->_petsc);
