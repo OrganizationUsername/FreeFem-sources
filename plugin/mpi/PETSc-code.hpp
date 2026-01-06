@@ -5236,7 +5236,7 @@ namespace PETSc {
         if (isType) {
           PC pc;
           KSPGetPC((*t)._ksp, &pc);
-          PetscObjectTypeCompareAny((PetscObject)pc, &isType, PCNONE, PCJACOBI, PCFIELDSPLIT, "");
+          PetscObjectTypeCompareAny((PetscObject)pc, &isType, PCNONE, PCJACOBI, PCFIELDSPLIT, PCSHELL, "");
           if (!isType) {
             Mat C;
             prepareConvert((*t)._petsc, &C);
