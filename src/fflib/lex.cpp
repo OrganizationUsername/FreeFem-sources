@@ -722,7 +722,7 @@ bool mylex::SetMacro(int &ret)
         ret= basescan();
         
     }
-    else if(strncmp(buf,"nodebugmacro",10)==0 )
+    else if(strncmp(buf,"nodebugmacro",12)==0 )
     {
         debugmacro = false;
         rt=true;
@@ -835,7 +835,7 @@ bool mylex::SetMacro(int &ret)
         }
         while(1);
         macroparm.d.push_back(def);
-        if(verbosity>999) cout <<" macro : " << macroname<< ", def =  :"<< def << endl;
+        if(verbosity>999|| debugmacro) cout <<" macro : " << macroname<< ", def =  :"<< def << endl;
         if (nbparam)
             if(echo) cout << " )  " ;
         MapMacroDef & MacroDef =listMacroDef->back();
