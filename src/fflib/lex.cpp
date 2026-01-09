@@ -277,7 +277,7 @@ int mylex::EatCommentAndSpace(string *data)
                 caux=source().peek();
                 if(caux =='/') {// ex:
                     source().get();
-                    getline(source(),nnn,,'\n'); // eat \n
+                    getline(source(),nnn,'\n'); // eat \n
                     if (echo) cout << "//"<< nnn  ;
                     if(data) *data+="//"+nnn;
                     source().putback('\n');
