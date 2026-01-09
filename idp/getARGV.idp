@@ -6,14 +6,15 @@
  // Modif version 3.54-2  Jan 2018 (add ones include)
  IFMACRO(!getARGVidp)
  NewMacro getARGVidp 1  EndMacro
+ /* Warning the // comment do not work if some windows macro F. Hecht 
+   no end !!!*/
  func int usedARGV(int n)
 {
   int k=1,ii=1,kk=1,ret=-1;
   for(int i=1;i<ARGV.n;++i)
    {
-   // cout <<i<< " "<< ARGV[i] << " " <<(ARGV[i]=="-v") << " " << kk << "==" 
-   //      << n << " " << ARGV[i].rfind("dp") << " " <<ARGV[i].length-2  << endl;
-        
+   /* cout <<i<< " "<< ARGV[i] << " " <<(ARGV[i]=="-v") << " " << kk << "==" 
+         << n << " " << ARGV[i].rfind("dp") << " " <<ARGV[i].length-2  << endl;*/   
        if(ARGV[i]=="-v") i++;
        else if(ARGV[i]=="-fglut") i++;
        else if(ARGV[i]=="-ffg") i++;
@@ -23,12 +24,12 @@
        else if(ARGV[i]=="-wait") ii;
        else if(ARGV[i]=="-ne") ii;
        else if(ARGV[i]=="-cd") ii;
-       //else if(ARGV[i].rfind(".edp")==ARGV[i].length-4 ) ii;
+       /*else if(ARGV[i].rfind(".edp")==ARGV[i].length-4 ) ii;*/
        else if(i==1) ii;
        else if(kk++==n) {ret=i;}
-      // else cout << " +++ \n";
+      /* else cout << " +++ \n";*/
      }
-   //  cout << ret << endl;
+   /*  cout << ret << endl;*/
     return ret;
 }
 

@@ -212,7 +212,7 @@ int mylex::EatCommentAndSpace(string *data)
     };
     auto  GetLine = [&](string nnn) {
         // begin of line !!!
-        getline(source(),nnn);
+        getline(source(),nnn,'\n');
         LineNumber();
         
     };
@@ -244,7 +244,7 @@ int mylex::EatCommentAndSpace(string *data)
                 int c1=source().get();
                 int c2=source().get();
                 if( c1==mark && c2==mark) {
-                    getline(source(),nnn); // get end of line
+                    getline(source(),nnn,'\n'); // get end of line
                     if(data) *data += mark3+nnn;
                     if (echomd) cout << mark3<< nnn  ;
                     linenumber++;
@@ -277,7 +277,7 @@ int mylex::EatCommentAndSpace(string *data)
                 caux=source().peek();
                 if(caux =='/') {// ex:
                     source().get();
-                    getline(source(),nnn); // eat \n
+                    getline(source(),nnn,,'\n'); // eat \n
                     if (echo) cout << "//"<< nnn  ;
                     if(data) *data+="//"+nnn;
                     source().putback('\n');
@@ -325,7 +325,7 @@ int mylex::EatCommentAndSpace(string *data)
             sep=space;
             do
             {
-                getline(source(),nnn);//  get line
+                getline(source(),nnn,'\n');//  get line
                 if(echomd) cout << linenumber << " ::: " << nnn << endl;
                 linenumber++;
                 if(data) *data+=nnn+'\n';
