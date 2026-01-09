@@ -8796,7 +8796,7 @@ class Movemesh : public OneOperator {
 
       ffassert(a);
       if (a->size( ) < size) {
-        CompileError("movemesh(Th,[ ],...) bad reequired componatenumber in array ", atype< ppmesh >( ));
+        CompileError("movemesh(Th,[ ],...) bad required componate number in array ", atype< ppmesh >( ));
       }
 
       Expression X = to< double >((*a)[0]); 

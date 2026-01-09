@@ -44,7 +44,7 @@ extern YYSTYPE *plglval;
 //  and more  simple
 // FH Jan. 2005
 
-static const bool debugmacro = false;
+static  bool debugmacro = false;
 
 int  setMarkdown(const char * fn)
   {
@@ -715,7 +715,21 @@ bool mylex::SetMacro(int &ret)
 
     bool rt=false;
     int oldmacro=1;
-    if (strncmp(buf,"macro",6)==0 || (oldmacro=strncmp(buf,newmacro,9))==0 )
+    if(strncmp(buf,"debugmacro",10)==0 )
+    {
+        debugmacro = true;
+        rt=true;
+        ret= basescan();
+        
+    }
+    else if(strncmp(buf,"nodebugmacro",10)==0 )
+    {
+        debugmacro = false;
+        rt=true;
+        ret= basescan();
+        
+    }
+    else if (strncmp(buf,"macro",6)==0 || (oldmacro=strncmp(buf,newmacro,9))==0 )
     {
         if(echo)  print(cout);
         char *macroname=newcopy(match(ID));
@@ -870,6 +884,8 @@ bool mylex::IFMacroId(bool isnot,string & id,bool withval ,string &val)
             
         }
     }
+    if(debugmacro)  cout << " check IFMACRO '"<< id << "' exist "<< exist << " isnot "
+                         << isnot   <<endl;
     return exist == (isnot==0);
 }
 bool mylex::IFMacroArgs(int lvl)
