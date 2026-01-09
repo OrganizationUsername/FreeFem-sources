@@ -915,6 +915,10 @@ namespace PETSc {
               MatSetSizes(ptA->_petsc, ptA->_last - ptA->_first, ptA->_last - ptA->_first,
                           PETSC_DECIDE, PETSC_DECIDE);
             }
+            if (ptA->_exchange) {
+              if (ptA->_exchange[0]) ffassert(ptA->_exchange[0]->getDof() == mN->n);
+              if (ptA->_exchange[1]) ffassert(ptA->_exchange[1]->getDof() == mN->m);
+            }
             if (ptA->_A && ptA->_A->getMatrix( )->HPDDM_sym) {
               MatSetType(ptA->_petsc, MATSBAIJ);
               MatSetUp(ptA->_petsc);
@@ -2116,7 +2120,7 @@ namespace PETSc {
       Expression A;
       Expression P;
       const int c;
-      static const int n_name_param = 21;
+      static const int n_name_param = 22;
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
       setOptions_Op(const basicAC_F0& args, int d) : A(0), P(0), c(d) {
@@ -2170,7 +2174,8 @@ namespace PETSc {
     {"precon", &typeid(Polymorphic*)},                                                            // 17
     {"setup", &typeid(bool)},                                                                     // 18
     {"monitor", &typeid(Polymorphic*)},                                                           // 19
-    {"deflation", &typeid(FEbaseArrayKn<upscaled_type<PetscScalar>>*)}                            // 20
+    {"deflation", &typeid(FEbaseArrayKn<upscaled_type<PetscScalar>>*)},                           // 20
+    {"transposenullspace", &typeid(KNM< upscaled_type<PetscScalar> >*)}                           // 21
   };
   class ShellInjection;
   template< class Type >
@@ -2656,40 +2661,33 @@ namespace PETSc {
             nargs[1] ? GetAny< FEbaseArrayKn< upscaled_type<PetscScalar> >* >((*nargs[1])(stack)) : 0;
           KNM< upscaled_type<PetscScalar> >* ptPETScNS =
             nargs[8] ? GetAny< KNM< upscaled_type<PetscScalar> >* >((*nargs[8])(stack)) : 0;
+          KNM< upscaled_type<PetscScalar> >* ptPETScTNS =
+            nargs[21] ? GetAny< KNM< upscaled_type<PetscScalar> >* >((*nargs[21])(stack)) : 0;
           int dim = ptNS ? ptNS->N : 0;
           int dimPETSc = ptPETScNS ? ptPETScNS->M( ) : 0;
-          if (dim || dimPETSc) {
+          int dimPETScT = ptPETScTNS ? ptPETScTNS->N( ) : 0;
+          if (dim) {
             Vec v;
             MatCreateVecs(ptA->_petsc, &v, NULL);
             Vec* ns;
-            VecDuplicateVecs(v, std::max(dim, dimPETSc), &ns);
+            VecDuplicateVecs(v, dim, &ns);
             VecDestroy(&v);
-            if (std::max(dim, dimPETSc) == dimPETSc) {
-              PetscInt m;
-              VecGetLocalSize(ns[0], &m);
-              for (unsigned short i = 0; i < dimPETSc; ++i) {
-                PetscScalar* x;
-                VecGetArray(ns[i], &x);
-                for (int j = 0; j < m; ++j) x[j] = (*ptPETScNS)(j, i);
-                VecRestoreArray(ns[i], &x);
+            for (unsigned short i = 0; i < dim; ++i) {
+              PetscScalar* x;
+              VecGetArray(ns[i], &x);
+              upscaled_type<PetscScalar>* get = *ptNS->get(i);
+              PetscScalar* base = reinterpret_cast<PetscScalar*>(get);
+              if(!std::is_same<upscaled_type<PetscReal>, PetscReal>::value) {
+                  for(int j = 0; j < ptNS->get(i)->n; ++j)
+                      base[j] = get[j];
               }
-            } else
-              for (unsigned short i = 0; i < dim; ++i) {
-                PetscScalar* x;
-                VecGetArray(ns[i], &x);
-                upscaled_type<PetscScalar>* get = *ptNS->get(i);
-                PetscScalar* base = reinterpret_cast<PetscScalar*>(get);
-                if(!std::is_same<upscaled_type<PetscReal>, PetscReal>::value) {
-                    for(int j = 0; j < ptNS->get(i)->n; ++j)
-                        base[j] = get[j];
-                }
-                HPDDM::Subdomain< PetscScalar >::template distributedVec< 0 >(
-                  ptA->_num, ptA->_first, ptA->_last, base,
-                  x, static_cast<PetscInt>(ptNS->get(i)->n));
-                VecRestoreArray(ns[i], &x);
-              }
-            PetscScalar* dots = new PetscScalar[std::max(dim, dimPETSc)];
-            for (unsigned short i = 0; i < std::max(dim, dimPETSc); ++i) {
+              HPDDM::Subdomain< PetscScalar >::template distributedVec< 0 >(
+                ptA->_num, ptA->_first, ptA->_last, base,
+                x, static_cast<PetscInt>(ptNS->get(i)->n));
+              VecRestoreArray(ns[i], &x);
+            }
+            PetscScalar* dots = new PetscScalar[dim - 1];
+            for (unsigned short i = 0; i < dim; ++i) {
               if (i > 0) {
                 VecMDot(ns[i], i, ns, dots);
                 for (int j = 0; j < i; ++j) dots[j] *= -1.0;
@@ -2699,11 +2697,70 @@ namespace PETSc {
             }
             delete[] dots;
             MatNullSpace sp;
-            MatNullSpaceCreate(PetscObjectComm((PetscObject)ptA->_petsc), PETSC_FALSE, std::max(dim, dimPETSc), ns, &sp);
-            if (dim) MatSetNearNullSpace(ptA->_petsc, sp);
-            else MatSetNullSpace(ptA->_petsc, sp);
+            MatNullSpaceCreate(PetscObjectComm((PetscObject)ptA->_petsc), PETSC_FALSE, dim, ns, &sp);
+            MatSetNearNullSpace(ptA->_petsc, sp);
             MatNullSpaceDestroy(&sp);
-            VecDestroyVecs(std::max(dim, dimPETSc), &ns);
+            VecDestroyVecs(dim, &ns);
+          }
+          if (dimPETSc) {
+            Vec v;
+            MatCreateVecs(ptA->_petsc, &v, NULL);
+            Vec* ns;
+            VecDuplicateVecs(v, dimPETSc, &ns);
+            VecDestroy(&v);
+            PetscInt m;
+            VecGetLocalSize(ns[0], &m);
+            for (unsigned short i = 0; i < dimPETSc; ++i) {
+              PetscScalar* x;
+              VecGetArray(ns[i], &x);
+              for (int j = 0; j < m; ++j) x[j] = (*ptPETScNS)(j, i);
+              VecRestoreArray(ns[i], &x);
+            }
+            PetscScalar* dots = new PetscScalar[dimPETSc - 1];
+            for (unsigned short i = 0; i < dimPETSc; ++i) {
+              if (i > 0) {
+                VecMDot(ns[i], i, ns, dots);
+                for (int j = 0; j < i; ++j) dots[j] *= -1.0;
+                VecMAXPY(ns[i], i, dots, ns);
+              }
+              VecNormalize(ns[i], NULL);
+            }
+            delete[] dots;
+            MatNullSpace sp;
+            MatNullSpaceCreate(PetscObjectComm((PetscObject)ptA->_petsc), PETSC_FALSE, dimPETSc, ns, &sp);
+            MatSetNullSpace(ptA->_petsc, sp);
+            MatNullSpaceDestroy(&sp);
+            VecDestroyVecs(dimPETSc, &ns);
+          }
+          if (dimPETScT) {
+            Vec v;
+            MatCreateVecs(ptA->_petsc, NULL, &v);
+            Vec* ns;
+            VecDuplicateVecs(v, dimPETScT, &ns);
+            VecDestroy(&v);
+            PetscInt m;
+            VecGetLocalSize(ns[0], &m);
+            for (unsigned short i = 0; i < dimPETScT; ++i) {
+              PetscScalar* x;
+              VecGetArray(ns[i], &x);
+              for (int j = 0; j < m; ++j) x[j] = (*ptPETScTNS)(j, i);
+              VecRestoreArray(ns[i], &x);
+            }
+            PetscScalar* dots = new PetscScalar[dimPETScT - 1];
+            for (unsigned short i = 0; i < dimPETScT; ++i) {
+              if (i > 0) {
+                VecMDot(ns[i], i, ns, dots);
+                for (int j = 0; j < i; ++j) dots[j] *= -1.0;
+                VecMAXPY(ns[i], i, dots, ns);
+              }
+              VecNormalize(ns[i], NULL);
+            }
+            delete[] dots;
+            MatNullSpace sp;
+            MatNullSpaceCreate(PetscObjectComm((PetscObject)ptA->_petsc), PETSC_FALSE, dimPETScT, ns, &sp);
+            MatSetTransposeNullSpace(ptA->_petsc, sp);
+            MatNullSpaceDestroy(&sp);
+            VecDestroyVecs(dimPETScT, &ns);
           }
           PC pc;
           KSPGetPC(ksp, &pc);
@@ -5179,7 +5236,7 @@ namespace PETSc {
         if (isType) {
           PC pc;
           KSPGetPC((*t)._ksp, &pc);
-          PetscObjectTypeCompareAny((PetscObject)pc, &isType, PCNONE, PCJACOBI, PCFIELDSPLIT, "");
+          PetscObjectTypeCompareAny((PetscObject)pc, &isType, PCNONE, PCJACOBI, PCFIELDSPLIT, PCSHELL, "");
           if (!isType) {
             Mat C;
             prepareConvert((*t)._petsc, &C);

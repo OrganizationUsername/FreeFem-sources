@@ -1147,14 +1147,14 @@ IFMACRO(dimension,2)
 ENDIFMACRO
 IFMACRO(dimension,3)
                                                                               , zz = z / (bb[5] - bb[4]);
-            i = int(mpiSize(comm)^(0.333333333333333));
+            int i = int(mpiSize(comm)^(0.333333333333333));
             while(mpiSize(comm) % i != 0)
                 --i;
             real p = mpiSize(comm) / i;
-            j = int(sqrt(p));
+            int j = int(sqrt(p));
             while(p % j != 0)
                 --j;
-            real k = int(p / j);
+            int k = int(p / j);
             partGlobal = int(i * zz) * k * j + int(j * yy) * k + int(k * xx);
 ENDIFMACRO
         }
