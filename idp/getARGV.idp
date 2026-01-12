@@ -7,7 +7,7 @@
  IFMACRO(!getARGVidp)
  NewMacro getARGVidp 1  EndMacro
  /* Warning the // comment do not work if some windows macro F. Hecht 
-   no end !!!*/
+   no end !!! */
  func int usedARGV(int n)
 {
   int k=1,ii=1,kk=1,ret=-1;

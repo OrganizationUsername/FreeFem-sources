@@ -1,11 +1,11 @@
 //  a example to test the level of optimisation
 // --------------------------------------------
 // PARAM -n 100
-debugmacro 
+// debugmacro 
 include "getARGV.idp"
 
 int nn=getARGV("-n",300);
-nodebugmacro
+// nodebugmacro
  mesh Th=square(nn,nn);
 verbosity=5;
  fespace Vh(Th,P1);     // P1 FE space
