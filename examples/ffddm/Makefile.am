@@ -30,6 +30,7 @@ TESTS_HPDDM = diffusion-2d-thirdlevelgeneo.edp \
 	diffusion-3d-minimal-ddm.edp\
 	diffusion-3d-minimal-direct.edp \
 	diffusion-3d-simple.edp \
+	diffusion-2d-periodic.edp \
 	Helmholtz-2d-HPDDM-BGMRES.edp \
 	Helmholtz-2d-simple.edp \
 	Helmholtz-2d-ORAS-recursive.edp \

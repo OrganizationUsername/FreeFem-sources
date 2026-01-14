@@ -37,15 +37,21 @@ if (prmesh#isincomm)
       int numberIntersectioni = 0;
       
       prmesh#meshN overlapName=Th;
+      IFMACRO(!prmesh#periodic)
       fespace VhGlobalff(overlapName, P1);
+      ENDIFMACRO
+      IFMACRO(prmesh#periodic)
+      fespace VhGlobalff(overlapName, P1,periodic=prmesh#periodic);
+      ENDIFMACRO
       fespace PhGlobalff(overlapName, P0);
       PhGlobalff part;
       part[]=partdof;
       
       PhGlobalff supp = abs(part - ii) < 0.1;
+
       VhGlobalff suppSmooth;
-      AddLayers(overlapName, supp[], (sizeoverlaps == 0) + sizeoverlaps * 2, suppSmooth[]);
-      {   
+      AddLayers(VhGlobalff, supp[], (sizeoverlaps == 0) + sizeoverlaps * 2, suppSmooth[]);
+      {
         prmesh#meshN neighbors = trunc(overlapName, suppSmooth > 0.001 && (suppSmooth < 0.999));
         fespace Oh(neighbors, P0);
         Oh partOverlap = part;
@@ -62,7 +68,7 @@ if (prmesh#isincomm)
         overlapName = trunc(overlapName, suppSmooth > 0.001, split = ffddmsplit, label=9999);
         supp = abs(part - ii) < 0.1;
         suppSmooth = 0;
-        AddLayers(overlapName, supp[], (sizeoverlaps == 0) + 2 * sizeoverlaps, suppSmooth[]);
+        AddLayers(VhGlobalff, supp[], (sizeoverlaps == 0) + 2 * sizeoverlaps, suppSmooth[]);
       }
       ENDIFMACRO
 
@@ -197,7 +203,7 @@ if (prmesh#isincomm)
         khi = max(suppSmooth*2 - 1.0, 0.);
         if(usedARGV("-whatname") != -1) {
           supp = abs(part - ii) < 0.1;
-          AddLayers(overlapName, supp[], (sizeoverlaps == 0) + max(sizeoverlaps-1,1), suppSmooth[]);
+          AddLayers(VhGlobalff, supp[], (sizeoverlaps == 0) + max(sizeoverlaps-1,1), suppSmooth[]);
           khi = suppSmooth;
         }
         else if(usedARGV("-steep") != -1)
@@ -237,12 +243,12 @@ if (prmesh#isincomm)
         PhGlobalff suppP0;
         suppP0[] = suppPartition[];
         if (sizeoverlaps > 0) {
-          AddLayers(overlapName, suppPartition[], sizeoverlaps, phi[]);
+          AddLayers(VhGlobalff, suppPartition[], sizeoverlaps, phi[]);
           phibase[] = phi[];
 
           if(usedARGV("-whatname") != -1) {
             suppPartition = abs(arrayIntersectioni[i] - part) < 0.1;
-            AddLayers(overlapName, suppPartition[], max(sizeoverlaps-1,1), phi[]);
+            AddLayers(VhGlobalff, suppPartition[], max(sizeoverlaps-1,1), phi[]);
           }
           else if(usedARGV("-steep") != -1)
             phi = phi > 0.001 ? 1.0 : 0.0;
