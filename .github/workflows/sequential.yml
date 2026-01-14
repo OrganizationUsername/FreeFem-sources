@@ -60,7 +60,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: [13, 14, 15]
+        version: [14, 15, 26]
         cfg:
         - {opts: --enable-debug}
         - {opts: --enable-optim --enable-generic}
@@ -98,11 +98,10 @@ jobs:
       fail-fast: false
       matrix:
         cfg:
-#        - {opts: --enable-debug}
         - {opts: --enable-optim --enable-generic}
 
-    name: Windows Server 2022 with ${{ matrix.cfg.opts }} - ${{github.workflow}}
-    runs-on: windows-2022
+    name: Windows Server 2025 with ${{ matrix.cfg.opts }} - ${{github.workflow}}
+    runs-on: windows-2025
 
     defaults:
       run:
@@ -124,7 +123,6 @@ jobs:
             bison
             unzip
             mingw-w64-x86_64-openblas
-            mingw-w64-x86_64-hdf5
             mingw-w64-x86_64-gsl
             pkg-config
             pkgfile
