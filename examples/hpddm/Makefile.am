@@ -57,7 +57,6 @@ TESTS_PETSC = bratu-2d-PETSc.edp \
 	diffusion-cartesian-2d-PETSc.edp \
 	diffusion-3d-PETSc.edp \
 	diffusion-periodic-2d-PETSc.edp \
-	diffusion-periodic-balanced-2d-PETSc.edp \
 	elasticity-2d-PETSc.edp \
 	elasticity-3d-PETSc.edp \
 	elasticity-SNES-3d-PETSc.edp \

@@ -139,7 +139,7 @@ IFMACRO(!privateCreateMat)
     {
         int constant = rank;
         for[i, value : supp[]] value = abs(part[][i] - constant) < 0.1;
-        AddLayers(globalName, supp[], 2 * overlap, suppSmooth[]);
+        AddLayers(VhGlobalPrivate, supp[], 2 * overlap, suppSmooth[]);
         int[int] n2o;
         meshN neighbors;
         bool connected = false;
@@ -154,7 +154,7 @@ IFMACRO(!privateCreateMat)
             globalName = trunc(globalName, suppSmooth > 0.001, split = s);
             supp = abs(part - constant) < 0.1;
             suppSmooth = 0;
-            AddLayers(globalName, supp[], 2 * overlap, suppSmooth[]);
+            AddLayers(VhGlobalPrivate, supp[], 2 * overlap, suppSmooth[]);
         }
     }
     int[int] n2oGlobalPrivate, n2oNeighbor;
@@ -276,7 +276,7 @@ ENDIFMACRO
         mpiWaitAll(rq);
         for(int i = 0; i < intersection[0].n; ++i) {
             PhGlobalPrivate suppPartition = abs(part - intersection[0][i]) < 0.1;
-            AddLayers(globalName, suppPartition[], overlap, phi[]);
+            AddLayers(VhGlobalPrivate, suppPartition[], overlap, phi[]);
             if(min(eps, epsTab[i]) > 0.0) {
                 if(intN(globalName, qforder = 2)(phi) / min(eps, epsTab[i]) > 1.0e-10) {
                     privateDmesh#meshName#intersectionDef[1 + numberIntersection].resize(restriction.n);
@@ -513,7 +513,7 @@ ENDIFMACRO
         for[i, value : intersection[0]] privateDmesh#meshName#intersectionDef[0][i] = value;
         if(fakeInterface != -111111 || overlap != 1) {
             PhGlobalPrivate suppPartition = khi > 0.1;
-            AddLayers(globalName, suppPartition[], 1, phi[]);
+            AddLayers(VhGlobalPrivate, suppPartition[], 1, phi[]);
             borderName[0] = trunc(globalName, phi > 0.001 && phi < 0.501, label = (abs(fakeInterface) + 1) * 100);
         }
     }
@@ -714,6 +714,15 @@ NewMacro privateDmesh#N2O()ThName#N2O EndMacro
 IFMACRO(ThName#RefinementFactor)
 exit(10); /* not currently implemented */
 ENDIFMACRO
+IFMACRO(ThName#Periodicity)
+if(mpirank == 0) cout << "Deprecated \"" << Stringification(ThName) << "Periodicity\" macro, switch to: \n  NewMacro " << Stringification(ThName) << "Periodic() EndMacro" << endl; /* TODO FIXME: remove at some point (deprecated since January 2026) */
+ENDIFMACRO
+IFMACRO(ThName#Periodic)
+IFMACRO(ThName#Periodicity)
+exit(21); /* not currently implemented */
+ENDIFMACRO
+NewMacro privateDmesh#Periodic()ThName#Periodic EndMacro
+ENDIFMACRO
 ENDIFMACRO
 IFMACRO(ThName#UserPartitioning)
 IFMACRO(ThName#RefinementFactor)
@@ -721,7 +730,7 @@ exit(11); /* not currently implemented */
 ENDIFMACRO
 buildWithPartitioning(ThName, ThName#UserPartitioning, 1, intersection, privateDmesh#ThName#khi[0], P1, ThName#Comm);
 ENDIFMACRO
-IFMACRO(ThName#Periodicity)
+IFMACRO((ThName#Periodic)|(ThName#Periodicity))
 IFMACRO(ThName#RefinementFactor)
 exit(12); /* not currently implemented */
 ENDIFMACRO
@@ -729,14 +738,24 @@ IFMACRO(ThName#Overlap)
 assert(ThName#Overlap > 0);
 meshN privateBorder;
 int privateS = 1;
+IFMACRO(!ThName#Periodicity)
+buildOverlap(ThName, privateBorder, -111111, privateS, ThName#Overlap, intersection, privateDmesh#ThName#khi[0], P1, ThName#Comm, false)
+ENDIFMACRO
+IFMACRO(ThName#Periodicity)
 buildOverlapPeriodic(ThName, privateBorder, -111111, privateS, ThName#Overlap, intersection, privateDmesh#ThName#khi[0], P1, ThName#Comm, false, ThName#Periodicity)
 ENDIFMACRO
+ENDIFMACRO
 IFMACRO(!ThName#Overlap)
+IFMACRO(!ThName#Periodicity)
+build(ThName, 1, intersection, privateDmesh#ThName#khi[0], P1, ThName#Comm);
+ENDIFMACRO
+IFMACRO(ThName#Periodicity)
 buildPeriodic(ThName, 1, intersection, privateDmesh#ThName#khi[0], P1, ThName#Comm, ThName#Periodicity);
 ENDIFMACRO
 ENDIFMACRO
+ENDIFMACRO
 IFMACRO(!ThName#UserPartitioning)
-IFMACRO(!ThName#Periodicity)
+IFMACRO((!ThName#Periodic)&(!ThName#Periodicity))
 IFMACRO(ThName#CartesianPartitioning)
 IFMACRO(!dimension)
 NewMacro dimension()2 EndMacro
@@ -1129,7 +1148,12 @@ ENDIFMACRO
     if(mpiSize(comm) > 1 && !excluded) {
         meshN ThGlobal = Th[level - 1];
         fespace PhGlobalPrivate(ThGlobal, P0);
+IFMACRO(privateDmesh#Periodic)
+        fespace VhGlobalPrivate(ThGlobal, P1, periodic = privateDmesh#Periodic);
+ENDIFMACRO
+IFMACRO(!privateDmesh#Periodic)
         fespace VhGlobalPrivate(ThGlobal, P1);
+ENDIFMACRO
         PhGlobalPrivate partGlobal;
 IFMACRO(!privateReconstructDmesh)
 IFMACRO(privateDmesh#CartesianPartitioning)
@@ -1170,7 +1194,7 @@ IFMACRO(!privateDmesh#CartesianPartitioning)
                 marker[] = vMarker(0, VhGlobalPrivate, tgv = -1);
                 PhGlobalPrivate partPeriodic = marker > 0.1;
                 while(1) {
-                    AddLayers(ThGlobal, partPeriodic[], 1 + overlap, marker[]);
+                    AddLayers(VhGlobalPrivate, partPeriodic[], 1 + overlap, marker[]);
                     partPeriodic = marker > 0.001;
                     ThGlobalPeriodic = trunc(ThGlobal, partPeriodic < 0.999, new2old = n2oPeriodic);
                     if(ThGlobal.nt / real(ThGlobalPeriodic.nt) > mpiSize(comm) / real(mpiSize(comm) - 1))

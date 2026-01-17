@@ -6,7 +6,6 @@ include "macro_ddm.idp"             // additional DDM functions
 
 macro grad(u)[dx(u), dy(u)]// EOM   // two-dimensional gradient
 int[int] labPeriodic = [2, 4, 1, 3];
-macro Pk() P2, periodic=[[labPeriodic[0],x+y], [labPeriodic[1],x+y], [labPeriodic[2],x-y], [labPeriodic[3],x-y]]// EOM
 
 real r = 0.25;
 border a(t=0,1)    { x = -t+1; y = t;             label = 1; };
@@ -18,8 +17,9 @@ border e(t=0,2*pi) { x = r*cos(t); y = -r*sin(t); label = 0; };
 mesh Th = buildmesh(a(getARGV("-global", 40)) + b(getARGV("-global", 40)) + c(getARGV("-global", 40)) + d(getARGV("-global", 40)) + e(getARGV("-global", 40)));
 Mat A;
 int[int] n2o;
-macro ThPeriodicity()labPeriodic//
 macro ThN2O()n2o//
+macro ThPeriodic()[[labPeriodic[0],x+y], [labPeriodic[1],x+y], [labPeriodic[2],x-y], [labPeriodic[3],x-y]]//
+macro Pk()P2, periodic = ThPeriodic// EOM
 DmeshCreate(Th);
 MatCreate(Th, A, Pk);
 
