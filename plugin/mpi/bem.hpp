@@ -78,12 +78,14 @@ KN< R > *partmetis( KN< R > *const &part, const FESPACE * pVh, long const &lpart
 
 double ff_htoolEta=10., ff_htoolEpsilon=1e-3;
 long ff_htoolMaxleafsize=100, ff_htoolMintargetdepth=0, ff_htoolMinsourcedepth=0;
+long ff_htoolAdaptiveclustering=0, ff_htoolClusteringdirections=0;
 
 template<class K>
 class HMatrixVirt {
 public:
     string solver = "fgmres";
     int state = 0;
+    bool factinplace = 0;
     virtual const std::map<std::string, std::string>& get_infos() const = 0;
     virtual void mvprod_global(const K* const in, K* const out,const int& mu=1) const = 0;
     virtual int nb_rows() const = 0;
@@ -114,13 +116,13 @@ private:
     std::shared_ptr<htool::Cluster<double>>  target_cluster;
     std::shared_ptr<htool::Cluster<double>>  source_cluster;
     htool::DefaultApproximationBuilder<K> distributed_operator_holder;
-
+    htool::HMatrix<K>* Hfact = 0;
 
 public:
     htool::HMatrix<K>& H;
     const htool::DistributedOperator<K>& distributed_operator;
     std::map<std::string, std::string> infos;
-    HMatrixImpl(htool::VirtualGenerator<K> &mat, std::shared_ptr<htool::Cluster<double>> t, std::shared_ptr<htool::Cluster<double>> s,const htool::HMatrixTreeBuilder<K,double>& hmatrix_tree_builder,string slvr,MPI_Comm comm) : target_cluster(t), source_cluster(s), distributed_operator_holder(mat,*target_cluster,*source_cluster,hmatrix_tree_builder,comm),distributed_operator(distributed_operator_holder.distributed_operator), H(distributed_operator_holder.hmatrix), infos(htool::get_distributed_hmatrix_information(H,distributed_operator.get_comm())){this->solver=slvr;}
+    HMatrixImpl(htool::VirtualGenerator<K> &mat, std::shared_ptr<htool::Cluster<double>> t, std::shared_ptr<htool::Cluster<double>> s,const htool::HMatrixTreeBuilder<K,double>& hmatrix_tree_builder,string slvr,bool factinplace, MPI_Comm comm) : target_cluster(t), source_cluster(s), distributed_operator_holder(mat,*target_cluster,*source_cluster,hmatrix_tree_builder,comm),distributed_operator(distributed_operator_holder.distributed_operator), H(distributed_operator_holder.hmatrix), infos(htool::get_distributed_hmatrix_information(H,distributed_operator.get_comm())){this->solver=slvr; this->factinplace=factinplace;}
     const std::map<std::string, std::string>& get_infos() const { return infos; }
     void mvprod_global(const K* const in, K* const out,const int& mu=1) const {
         K* work=nullptr;
@@ -174,8 +176,26 @@ public:
     htool::Matrix<K> get_local_dense() const {htool::Matrix<K> dense(H.nb_rows(),H.nb_cols());htool::copy_to_dense(H,dense.data());return dense;}
     int get_permt(int i) const {return H.get_target_cluster().get_permutation()[i];}
     int get_perms(int i) const {return H.get_source_cluster().get_permutation()[i];}
-    void factorization() {if (!this->state) {htool::lu_factorization(H); this->state=3;}}
-    void solve(htool::MatrixView<K> b) {if (!this->state) factorization(); htool::lu_solve('N',H,b);}
+    void factorization() {
+        if (!this->state) {
+            if (!this->factinplace) {
+                Hfact = new htool::HMatrix<K>(H);
+                htool::lu_factorization(*Hfact);
+            }
+            else
+                htool::lu_factorization(H);
+          this->state=3;
+        }
+    }
+    void solve(htool::MatrixView<K> b) {
+        if (!this->state)
+            factorization();
+        if (!this->factinplace)
+            htool::lu_solve('N',*Hfact,b);
+        else
+            htool::lu_solve('N',H,b);
+    }
+    ~HMatrixImpl() {if (Hfact) {delete Hfact; Hfact=0;}}
 };
 
 
@@ -184,7 +204,7 @@ struct Data_Bem_Solver
     double eta;
     int maxleafsize,mintargetdepth,minsourcedepth;
     string compressor, initialclustering, clusteringdirections;
-    bool recompress, adaptiveclustering;
+    bool recompress, adaptiveclustering, hluinplace;
        
     Data_Bem_Solver()
        : Data_Sparse_Solver(),
@@ -195,8 +215,9 @@ struct Data_Bem_Solver
        compressor("partialACA"),
        recompress(false),
        initialclustering("default"),
-       clusteringdirections("pca"),
-       adaptiveclustering(true)
+       clusteringdirections(!ff_htoolClusteringdirections?"pca":"boundingbox"),
+       adaptiveclustering(ff_htoolAdaptiveclustering),
+       hluinplace(false)
     
         {epsilon=ff_htoolEpsilon;}
      
@@ -291,6 +312,7 @@ inline void SetEnd_Data_Bem_Solver(Stack stack,Data_Bem_Solver & ds,Expression c
         if (nargs[++kk]) ds.initialclustering = *GetAny<string*>((*nargs[kk])(stack));
         if (nargs[++kk]) ds.clusteringdirections = *GetAny<string*>((*nargs[kk])(stack));
         if (nargs[++kk]) ds.adaptiveclustering = GetAny<bool>((*nargs[kk])(stack));
+        if (nargs[++kk]) ds.hluinplace = GetAny<bool>((*nargs[kk])(stack));
         ffassert(++kk == n_name_param);
     }   
 }
@@ -424,7 +446,7 @@ void buildHmat(HMatrixVirt<R>** Hmat, htool::VirtualGenerator<R>* generatorP,con
     hmatrix_builder.set_minimal_source_depth(data.minsourcedepth);
     if ((sizeWorld > 1) || (t != s))
         hmatrix_builder.set_block_tree_consistency(false);
-    HMatrixImpl<R>* test =new HMatrixImpl<R>(*generatorP, t,s,hmatrix_builder,data.solver,comm);
+    HMatrixImpl<R>* test =new HMatrixImpl<R>(*generatorP, t,s,hmatrix_builder,data.solver,data.hluinplace,comm);
     if (data.factorize && (data.solver == "HLU"))
         test->factorization();
     *Hmat = test;

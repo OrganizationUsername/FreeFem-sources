@@ -24,11 +24,10 @@ jobs:
       fail-fast: false
       matrix:
         cfg:
-#        - {opts: --enable-debug}
         - {opts: --enable-optim --enable-generic}
 
-    name: Windows Server 2022 with ${{ matrix.cfg.opts }} - ${{github.workflow}}
-    runs-on: windows-2022
+    name: Windows Server 2025 with ${{ matrix.cfg.opts }} - ${{github.workflow}}
+    runs-on: windows-2025
 
     defaults:
       run:
@@ -54,7 +53,6 @@ jobs:
             unzip
             mingw-w64-x86_64-gcc-fortran
             mingw-w64-x86_64-openblas
-            mingw-w64-x86_64-hdf5
             autoconf
             automake-wrapper
             pkg-config
@@ -78,9 +76,7 @@ jobs:
           autoreconf -i
           ./configure ${{ matrix.cfg.opts }} --enable-download \
           --enable-maintainer-mode \
-          --prefix="${HOME}/freefem" \
-          --with-mpipath="/c/Progam Files/Microsoft MPI/Bin"
-          MPICC=mpicc MPICXX=mpicxx MPIFC=mpif90
+          --prefix="${HOME}/freefem"
           ./3rdparty/getall -a -o PETSc
 
       - name: PETSc

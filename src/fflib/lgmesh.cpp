@@ -1600,6 +1600,45 @@ bool AddLayers(Mesh const * const & pTh, KN<double> * const & psupp, long const 
     return true;
 }
 
+bool AddLayersVh(pfes const & pVh, KN<double> * const & psupp, long const & nlayer,KN<double> * const & pphi)
+{
+    ffassert(pVh && psupp && pphi);
+    typedef typename v_fes::FESpace FESpace;
+    const FESpace & Uh = **pVh;
+    const int n = Uh.NbOfDF;
+    const int nve = Uh.MaxNbNodePerElement;
+    const Mesh & Th= Uh.Th;
+    const int nt = Th.nt;
+
+    KN<double> & supp(*psupp);
+    KN<double> u(n), s(nt);
+    KN<double> & phi(*pphi);
+    ffassert(supp.N()==nt); // P0
+    ffassert(phi.N()==n); // P1
+    s = supp;
+    phi=0.;
+
+    for(int step=0; step < nlayer; ++ step)
+    {
+        u = 0.;
+        for(int k=0; k<nt; ++k)
+            if(s[k] > 0.0)
+                for(int i=0; i<nve; ++i)
+                    u[Uh(k,i)] = 1.0;
+
+        phi += u;
+
+        s = 0.;
+        for(int k=0; k<nt; ++k)
+            for(int i=0; i<nve; ++i)
+                if(u[Uh(k,i)] > 0.0)
+                    s[k] = 1.0;
+
+        supp += s;
+    }
+    if (nlayer > 1) phi *= (1./nlayer);
+    return true;
+}
 
 double arealevelset(Mesh const * const & pTh,KN<double>  * const & pphi,const double & phi0,KN<double>  * const & where)
 {
@@ -1976,6 +2015,7 @@ void init_lgmesh() {
 		    new OneOperator2_<pmesh*,pmesh*,string* >(&initMesh));
     // Thg,suppi[],nnn,unssd[]
   Global.Add("AddLayers","(",new OneOperator4_<bool,const Mesh * , KN<double> * , long ,KN<double> * >(AddLayers));
+  Global.Add("AddLayers","(",new OneOperator4_<bool, pfes, KN<double> * , long ,KN<double> * >(AddLayersVh));
   Global.Add("SameMesh","(",new OneOperator2_<bool,const Mesh * ,const  Mesh * >(SameMesh));
   // use for :   mesh Th = readmesh ( ...);
     //  Add FH mars 2015 to compute mesure under levelset ...

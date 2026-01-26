@@ -510,7 +510,7 @@ AnyType SetCompressMat(Stack stack,Expression emat,Expression einter,int init)
     }
   hmatrix_builder.set_minimal_target_depth(mintargetdepth);
   hmatrix_builder.set_minimal_source_depth(minsourcedepth);
-  *Hmat = new HMatrixImpl<K>(A, t,t,hmatrix_builder,"HLU",comm);
+  *Hmat = new HMatrixImpl<K>(A, t,t,hmatrix_builder,"HLU",false,comm);
 
   return Hmat;
 }
@@ -557,6 +557,7 @@ AnyType SetHMatrix_Op<R>::operator()(Stack stack) const
     Data_Bem_Solver ds;
     SetEnd_Data_Bem_Solver<R>(stack,ds,nargs,OpCall_FormBilinear_np::n_name_param);
     (*A)->solver = ds.solver;
+    (*A)->factinplace = ds.hluinplace;
     if (ds.factorize && (ds.solver == "HLU"))
         (*A)->factorization();
 
@@ -817,7 +818,7 @@ class OpHMatrixUser : public OneOperator
         class Op : public E_F0info {
             public:
                 Expression g, uh1, uh2;
-                static const int n_name_param = 11;
+                static const int n_name_param = 12;
                 static basicAC_F0::name_and_type name_param[] ;
                 Expression nargs[n_name_param];
                 long argl(int i,Stack stack,long a) const{ return nargs[i] ? GetAny<long>( (*nargs[i])(stack) ): a;}
@@ -850,7 +851,8 @@ basicAC_F0::name_and_type  OpHMatrixUser<K,v_fes1,v_fes2>::Op::name_param[]= {
   {  "recompress", &typeid(bool)},
   {  "initialclustering", &typeid(string*)},
   {  "clusteringdirections", &typeid(string*)},
-  {  "adaptiveclustering", &typeid(bool)}
+  {  "adaptiveclustering", &typeid(bool)},
+  {  "hluinplace", &typeid(bool)}
 };
 
 template<class R, class v_fes1,class v_fes2, int init>
@@ -896,6 +898,7 @@ AnyType SetOpHMatrixUser(Stack stack,Expression emat, Expression eop)
     ds.initialclustering = *(op->args(8,stack,&ds.initialclustering));
     ds.clusteringdirections = *(op->args(9,stack,&ds.clusteringdirections));
     ds.adaptiveclustering = op->argb(10,stack,ds.adaptiveclustering);
+    ds.hluinplace = op->argb(11,stack,ds.hluinplace);
 
     const SMesh & ThU =Uh->Th;
     const TMesh & ThV =Vh->Th;
@@ -1106,6 +1109,8 @@ static void Init_Bem() {
     Global.New("htoolMaxleafsize",CPValue<long>(ff_htoolMaxleafsize));
     Global.New("htoolMintargetdepth",CPValue<long>(ff_htoolMintargetdepth));
     Global.New("htoolMinsourcedepth",CPValue<long>(ff_htoolMinsourcedepth));
+    Global.New("htoolAdaptiveclustering",CPValue<long>(ff_htoolAdaptiveclustering));
+    Global.New("htoolClusteringdirections",CPValue<long>(ff_htoolClusteringdirections));
     ArrayofHmat<double>();
     ArrayofHmat<complex<double>>();
 
