@@ -4030,6 +4030,7 @@ namespace PETSc {
     Matrice_Creuse< upscaled_type<PetscScalar> >* ptK =
       (c == 0 || c == 3 ? GetAny< Matrice_Creuse< upscaled_type<PetscScalar> >* >((*K)(stack)) : nullptr);
     if (ptB->_petsc && ptC->_petsc) {
+      if (ptA->_petsc) ptA->dtor( );
       ptA->_first = ptB->_first;
       ptA->_last = ptB->_last;
       ptA->_cfirst = ptC->_first;
