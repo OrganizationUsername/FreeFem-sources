@@ -1506,7 +1506,7 @@ AnyType SetMatrixInterpolation1(Stack stack,Expression emat,Expression einter,in
   ffassert(einter);
   pfes * pUh = GetAny< pfes * >((* mi->a)(stack));
   FESpace * Uh = **pUh;
-  int NUh =Uh->N;
+  int NUh =Uh ? Uh->N : 0;
   int* data = new int[4 + NUh];
   data[0]=mi->arg(0,stack,false); // transpose not
   data[1]=mi->arg(1,stack,(long) op_id); ; // get just value
@@ -1516,32 +1516,41 @@ AnyType SetMatrixInterpolation1(Stack stack,Expression emat,Expression einter,in
   U2Vc= mi->arg(4,stack,U2Vc); ;
   if( mi->c==0)
   { // old cas
-  pfes * pVh = GetAny<  pfes * >((* mi->b)(stack));
-  FESpace * Vh = **pVh;
-  int NVh =Vh->N;
+    pfes * pVh = GetAny<  pfes * >((* mi->b)(stack));
+    FESpace * Vh = **pVh;
+    if (Vh && Uh) {
+      int NVh =Vh->N;
 
-      for(int i=0;i<NUh;++i)
-        data[4+i]=i;//
-      for(int i=0;i<min(NUh,(int) U2Vc.size());++i)
-	  data[4+i]= U2Vc[i];//
-  if(verbosity>3)
-	for(int i=0;i<NUh;++i)
-	  {
-	    cout << "The Uh componante " << i << " -> " << data[4+i] << "  Componante of Vh  " <<endl;
-	  }
-	  for(int i=0;i<NUh;++i)
-	if(data[4+i]>=NVh)
-	  {
-	      cout << "The Uh componante " << i << " -> " << data[4+i] << " >= " << NVh << " number of Vh Componante " <<endl;
-	      ExecError("Interpolation incompability between componante ");
-	  }
+          for(int i=0;i<NUh;++i)
+            data[4+i]=i;//
+          for(int i=0;i<min(NUh,(int) U2Vc.size());++i)
+	      data[4+i]= U2Vc[i];//
+      if(verbosity>3)
+	    for(int i=0;i<NUh;++i)
+	      {
+	        cout << "The Uh componante " << i << " -> " << data[4+i] << "  Componante of Vh  " <<endl;
+	      }
+	      for(int i=0;i<NUh;++i)
+	    if(data[4+i]>=NVh)
+	      {
+	          cout << "The Uh componante " << i << " -> " << data[4+i] << " >= " << NVh << " number of Vh Componante " <<endl;
+	          ExecError("Interpolation incompability between componante ");
+	      }
 
-  ffassert(Vh);
-  ffassert(Uh);
+      ffassert(Vh);
+      ffassert(Uh);
 
-  if(!init) sparse_mat->init();
-      sparse_mat->typemat=0; //TypeSolveMat(TypeSolveMat::NONESQUARE); //  none square matrice (morse)
-  sparse_mat->A.master(buildInterpolationMatrix(*Uh,*Vh,data));
+      if(!init) sparse_mat->init();
+          sparse_mat->typemat=0; //TypeSolveMat(TypeSolveMat::NONESQUARE); //  none square matrice (morse)
+      sparse_mat->A.master(buildInterpolationMatrix(*Uh,*Vh,data));
+    } else {
+      int n = Uh ? Uh->NbOfDF : 0;
+      int m = Vh ? Vh->NbOfDF : 0;
+      HashMatrix<int,R> *phm= new HashMatrix<int,R>(n,m,0,0);
+      MatriceCreuse<R> *pmc(phm);
+      sparse_mat->typemat=0;
+      sparse_mat->A.master(pmc);
+    }
   }
   else
   {  // new cas mars 2006

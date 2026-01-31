@@ -704,22 +704,26 @@ long pmesh_nv(pmeshS * p) { ffassert(p) ;  return *p ? (**p).nv : 0;}
 long pmesh_nbe(pmeshS * p) { ffassert(p) ;  return *p ? (**p).nbe : 0;}
 
 double pmesh_hmax(pmeshS * p)
-{ ffassert(p && *p) ;
+{ if(p && *p) {
     double hmax2 =0;
     const MeshS & Th = **p;
     for(int k=0; k< Th.nt; ++k)
         for(int e=0; e<3; ++e)
             hmax2=max(hmax2,Th[k].Edge(e).norme2());
     return sqrt(hmax2);}
+  else return 0.0;
+}
 
 double pmesh_hmin(pmeshS * p)
-{ throwassert(p && *p) ;
+{ if(p && *p) {
     double hmin2 =1e100;
     const MeshS & Th = **p;
     for(int k=0; k< Th.nt; ++k)
         for(int e=0; e<3; ++e)
             hmin2=min(hmin2,Th[k].Edge(e).norme2());
     return sqrt(hmin2);}
+  else return 0.0;
+}
 
 template<class MMesh>
 class Op3_MeshDmp : public quad_function< const MMesh* *, R, R, R, MeshPoint * > {
@@ -784,21 +788,24 @@ long pmesh_nv(pmeshL * p) { ffassert(p) ;  return *p ? (**p).nv : 0;}
 long pmesh_nbe(pmeshL * p) { ffassert(p) ;  return *p ? (**p).nbe : 0;}
 
 double pmesh_hmax(pmeshL * p)
-{ ffassert(p && *p) ;
+{ if(p && *p) {
     double hmax2 =0;
     const MeshL & Th = **p;
     for(int k=0; k< Th.nt; ++k)
             hmax2=max(hmax2,Th[k].Edge(0).norme2());
     return sqrt(hmax2);}
+  else return 0.0;
+}
 
 double pmesh_hmin(pmeshL * p)
-{ throwassert(p && *p) ;
+{ if(p && *p) {
     double hmin2 =1e100;
     const MeshL & Th = **p;
     for(int k=0; k< Th.nt; ++k)
             hmin2=min(hmin2,Th[k].Edge(0).norme2());
     return sqrt(hmin2);}
-
+  else return 0.0;
+}
 
 
 
