@@ -1979,32 +1979,34 @@ ENDIFMACRO
     for[i, value : rankRecv]
         Irecv(processor(value, rqRecvTh[i]), recvTh[i]);
     for[i, value : rankSend] {
-        PhPartPrivate part;
+        if(PhPartPrivate.ndof) {
+            PhPartPrivate part;
 IFMACRO(dimension,2)
-        part = (bbAll[4 + 8 * value] < x
-             && bbAll[5 + 8 * value] > x
-             && bbAll[6 + 8 * value] < y
-             && bbAll[7 + 8 * value] > y) ? 1.0 : 0.0;
+            part = (bbAll[4 + 8 * value] < x
+                 && bbAll[5 + 8 * value] > x
+                 && bbAll[6 + 8 * value] < y
+                 && bbAll[7 + 8 * value] > y) ? 1.0 : 0.0;
 ENDIFMACRO
 IFMACRO(dimension,3)
-        part = (bbAll[6 + 12 * value] < x
-             && bbAll[7 + 12 * value] > x
-             && bbAll[8 + 12 * value] < y
-             && bbAll[9 + 12 * value] > y
-             && bbAll[10 + 12 * value] < z
-             && bbAll[11 + 12 * value] > z) ? 1.0 : 0.0;
+            part = (bbAll[6 + 12 * value] < x
+                 && bbAll[7 + 12 * value] > x
+                 && bbAll[8 + 12 * value] < y
+                 && bbAll[9 + 12 * value] > y
+                 && bbAll[10 + 12 * value] < z
+                 && bbAll[11 + 12 * value] > z) ? 1.0 : 0.0;
 ENDIFMACRO
-        if(part[].linfty > 1.0e-2) {
-            int[int] n2o;
-            sendTh[i] = trunc(ThName, part > 1.0e-2, new2old = n2o);
-            fespace VhRestrictionPrivate(sendTh[i], Pk);
-            int[int] map = restrict(VhRestrictionPrivate, VhLocalOldPrivate, n2o);
-            exchangeU[rankRecv.n + i].resize(VhRestrictionPrivate.ndof);
-            exchangeU[rankRecv.n + i] = scaledU[](map);
-            Isend(processor(value, rqSendTh[i]), sendTh[i]);
-            Isend(processor(value, rqSendU[i]), exchangeU[rankRecv.n + i]);
+            if(part[].linfty > 1.0e-2) {
+                int[int] n2o;
+                sendTh[i] = trunc(ThName, part > 1.0e-2, new2old = n2o);
+                fespace VhRestrictionPrivate(sendTh[i], Pk);
+                int[int] map = restrict(VhRestrictionPrivate, VhLocalOldPrivate, n2o);
+                exchangeU[rankRecv.n + i].resize(VhRestrictionPrivate.ndof);
+                exchangeU[rankRecv.n + i] = scaledU[](map);
+                Isend(processor(value, rqSendTh[i]), sendTh[i]);
+                Isend(processor(value, rqSendU[i]), exchangeU[rankRecv.n + i]);
+            }
         }
-        else
+        if(exchangeU[rankRecv.n + i].n == 0)
             Isend(processor(value, rqSendTh[i]), sendTh[i]);
     }
     meshN gluedExchange;
