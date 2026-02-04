@@ -67,22 +67,33 @@ template<class Type, class K, int init>
 AnyType To(Stack stack,Expression emat,Expression einter)
 { return To<Type, K>(stack,emat,einter,init);}
 
-template<class V, class K>
+template<class V, class K, char N>
 class Prod {
 public:
     const HMatrixVirt<K>* h;
     const V u;
     Prod(HMatrixVirt<K>** v, V w) : h(*v), u(w) {}
     
-    void prod(V x) const {int mu = this->u->n/h->nb_cols(); h->mvprod_global(*(this->u), *x, mu);};
+    void prod(V x) const {int mu = this->u->n/h->nb_cols(); h->mvprod_global(*(this->u), *x, 'N', mu);};
+    void prodT(V x) const {int mu = this->u->n/h->nb_rows(); h->mvprod_global(*(this->u), *x, 'C', mu);};
     
-    static V mv(V Ax, Prod<V, K> A) {
+    static V mv(V Ax, Prod<V, K, 'N'> A) {
         *Ax = K();
         A.prod(Ax);
         return Ax;
     }
-    static V init(V Ax, Prod<V, K> A) {
-        Ax->init(A.u->n);
+    static V init(V Ax, Prod<V, K, 'N'> A) {
+        Ax->init(A.h->nb_rows());
+        return mv(Ax, A);
+    }
+
+    static V mv(V Ax, Prod<V, K, 'T'> A) {
+        *Ax = K();
+        A.prodT(Ax);
+        return Ax;
+    }
+    static V init(V Ax, Prod<V, K, 'T'> A) {
+        Ax->init(A.h->nb_cols());
         return mv(Ax, A);
     }
     
@@ -577,10 +588,18 @@ void addHmat() {
     
     Add<HMatrixVirt<K>**>("infos",".",new OneOperator1_<std::map<std::string, std::string>*, HMatrixVirt<K>**>(get_infos));
     
-    Dcl_Type<Prod<KN<K>*, K>>();
-    TheOperators->Add("*", new OneOperator2<Prod<KN<K>*, K>, HMatrixVirt<K>**, KN<K>*>(Build));
-    TheOperators->Add("=", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K>>(Prod<KN<K>*, K>::mv));
-    TheOperators->Add("<-", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K>>(Prod<KN<K>*, K>::init));
+    Dcl_Type<Prod<KN<K>*, K, 'N'>>();
+    TheOperators->Add("*", new OneOperator2<Prod<KN<K>*, K, 'N'>, HMatrixVirt<K>**, KN<K>*>(Build));
+    TheOperators->Add("=", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K, 'N'>>(Prod<KN<K>*, K, 'N'>::mv));
+    TheOperators->Add("<-", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K, 'N'>>(Prod<KN<K>*, K, 'N'>::init));
+
+    Dcl_Type<Prod<KN<K>*, K, 'T'>>();
+    Dcl_Type<OpTrans<HMatrixVirt<K>*>>();
+    TheOperators->Add("\'", new OneOperator1<OpTrans<HMatrixVirt<K>*>, HMatrixVirt<K>**>(Build));
+    TheOperators->Add("*", new OneOperator2<Prod<KN<K>*, K, 'T'>, OpTrans<HMatrixVirt<K>*>, KN<K>*>(Build));
+    TheOperators->Add("=", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K, 'T'>>(Prod<KN<K>*, K, 'T'>::mv));
+    TheOperators->Add("<-", new OneOperator2<KN<K>*, KN<K>*, Prod<KN<K>*, K, 'T'>>(Prod<KN<K>*, K, 'T'>::init));
+
 
     SetHMatrix_Op<K>::btype = Dcl_Type<const  SetHMatrix_Op<K> * >();
     Global.Add("set","(",new SetHMatrix<K>);
@@ -699,9 +718,6 @@ AnyType OpHMatrixtoBEMForm<R,MMesh,v_fes1,v_fes2>::Op::operator()(Stack stack)  
     SetEnd_Data_Bem_Solver<R>(stack,ds, b->nargs,OpCall_FormBilinear_np::n_name_param);  // LIST_NAME_PARM_HMAT
     WhereStackOfPtr2Free(stack)=new StackOfPtr2Free(stack);
 
-    bool samemesh = (void*)&Uh->Th == (void*)&Vh->Th;  // same Fem2D::Mesh     +++ pot or kernel
-    if (VFBEM==1)
-        ffassert (samemesh);
      if(init)
         *Hmat =0;
       *Hmat =0;

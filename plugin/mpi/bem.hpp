@@ -87,7 +87,7 @@ public:
     int state = 0;
     bool factinplace = 0;
     virtual const std::map<std::string, std::string>& get_infos() const = 0;
-    virtual void mvprod_global(const K* const in, K* const out,const int& mu=1) const = 0;
+    virtual void mvprod_global(const K* const in, K* const out, const char N='N', const int& mu=1) const = 0;
     virtual int nb_rows() const = 0;
     virtual int nb_cols() const = 0;
     virtual void cluster_to_target_permutation(const K* const in, K* const out) const = 0;
@@ -124,15 +124,20 @@ public:
     std::map<std::string, std::string> infos;
     HMatrixImpl(htool::VirtualGenerator<K> &mat, std::shared_ptr<htool::Cluster<double>> t, std::shared_ptr<htool::Cluster<double>> s,const htool::HMatrixTreeBuilder<K,double>& hmatrix_tree_builder,string slvr,bool factinplace, MPI_Comm comm) : target_cluster(t), source_cluster(s), distributed_operator_holder(mat,*target_cluster,*source_cluster,hmatrix_tree_builder,comm),distributed_operator(distributed_operator_holder.distributed_operator), H(distributed_operator_holder.hmatrix), infos(htool::get_distributed_hmatrix_information(H,distributed_operator.get_comm())){this->solver=slvr; this->factinplace=factinplace;}
     const std::map<std::string, std::string>& get_infos() const { return infos; }
-    void mvprod_global(const K* const in, K* const out,const int& mu=1) const {
+    void mvprod_global(const K* const in, K* const out, const char N='N', const int& mu=1) const {
         K* work=nullptr;
         if (mu==1){
-            add_distributed_operator_vector_product_global_to_global('N',K(1),distributed_operator,in,K(0),out,work);
-        } else{
+            add_distributed_operator_vector_product_global_to_global(N,K(1),distributed_operator,in,K(0),out,work);
+        } else if (N=='N'){
             htool::MatrixView<K> out_view(distributed_operator.get_target_partition().get_global_size() ,mu,out);
             htool::MatrixView< const K> in_view(distributed_operator.get_source_partition().get_global_size() ,mu,in);
-            add_distributed_operator_matrix_product_global_to_global('N',K(1),distributed_operator,in_view,K(0),out_view,work);
-        }    
+            add_distributed_operator_matrix_product_global_to_global(N,K(1),distributed_operator,in_view,K(0),out_view,work);
+        }
+        else {
+            htool::MatrixView<K> out_view(distributed_operator.get_source_partition().get_global_size() ,mu,out);
+            htool::MatrixView< const K> in_view(distributed_operator.get_target_partition().get_global_size() ,mu,in);
+            add_distributed_operator_matrix_product_global_to_global(N,K(1),distributed_operator,in_view,K(0),out_view,work);
+        }
     }
     int nb_rows() const { return distributed_operator.get_target_partition().get_global_size();}
     int nb_cols() const { return distributed_operator.get_source_partition().get_global_size();}
@@ -463,9 +468,13 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
     typedef typename TMesh::RdHat TRdHat;
 
     typedef typename std::conditional<SMesh::RdHat::d==1,bemtool::Mesh1D,bemtool::Mesh2D>::type MeshBemtool;
+    typedef typename std::conditional<TMesh::RdHat::d==1,bemtool::Mesh1D,bemtool::Mesh2D>::type MeshBemtoolX;
     typedef typename std::conditional<SMesh::RdHat::d==1,bemtool::P0_1D,bemtool::P0_2D>::type P0;
     typedef typename std::conditional<SMesh::RdHat::d==1,bemtool::P1_1D,bemtool::P1_2D>::type P1;
     typedef typename std::conditional<SMesh::RdHat::d==1,bemtool::P2_1D,bemtool::P2_2D>::type P2;
+    typedef typename std::conditional<TMesh::RdHat::d==1,bemtool::P0_1D,bemtool::P0_2D>::type P0X;
+    typedef typename std::conditional<TMesh::RdHat::d==1,bemtool::P1_1D,bemtool::P1_2D>::type P1X;
+    typedef typename std::conditional<TMesh::RdHat::d==1,bemtool::P2_1D,bemtool::P2_2D>::type P2X;
 
     // size of the matrix
     int m=Uh->NbOfDF;
@@ -486,9 +495,10 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
     const TMesh & ThV =Vh->Th; // colunm
     bool samemesh = (void*)&Uh->Th == (void*)&Vh->Th;  // same Fem2D::Mesh     +++ pot or kernel
  
-    bemtool::Geometry node; MeshBemtool mesh;
+    bemtool::Geometry node; bemtool::Geometry nodeX; MeshBemtool mesh; MeshBemtoolX meshX;
     Mesh2Bemtool(ThU, node, mesh);
-
+    if (!samemesh && (VFBEM==1))
+        Mesh2Bemtool(ThV, nodeX, meshX);
 
     vector<double> pt(3*n);
     vector<double> ps(3*m);
@@ -634,15 +644,30 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
 
         if (SP0) {
             bemtool::Dof<P0> dof(mesh);
-            ff_BIO_Generator<R,P0,SMesh>(generator,Ker,dof,alpha);
+            if (samemesh)
+                ff_BIO_Generator<R,P0,P0,SMesh,SMesh>(generator,Ker,dof,dof,alpha);
+            else {
+                bemtool::Dof<P0X> dofX(meshX);
+                ff_BIO_Generator<R,P0X,P0,TMesh,SMesh>(generator,Ker,dofX,dof,alpha);
+            }
         }
         else if (SP1) {
             bemtool::Dof<P1> dof(mesh,true);
-            ff_BIO_Generator<R,P1,SMesh>(generator,Ker,dof,alpha);
+            if (samemesh)
+                ff_BIO_Generator<R,P1,P1,SMesh,SMesh>(generator,Ker,dof,dof,alpha);
+            else {
+                bemtool::Dof<P1X> dofX(meshX,true);
+                ff_BIO_Generator<R,P1X,P1,TMesh,SMesh>(generator,Ker,dofX,dof,alpha);
+            }
         }
         else if (SP2) {
             bemtool::Dof<P2> dof(mesh,true);
-            ff_BIO_Generator<R,P2,SMesh>(generator,Ker,dof,alpha);
+            if (samemesh)
+                ff_BIO_Generator<R,P2,P2,SMesh,SMesh>(generator,Ker,dof,dof,alpha);
+            else {
+                bemtool::Dof<P2X> dofX(meshX,true);
+                ff_BIO_Generator<R,P2X,P2,TMesh,SMesh>(generator,Ker,dofX,dof,alpha);
+            }
         }
         else if (SRT0 && SRdHat::d == 2) {
             // BemKernel->typeKernel[0] == 6 :: MA_SL
