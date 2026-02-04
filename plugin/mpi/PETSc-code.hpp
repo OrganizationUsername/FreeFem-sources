@@ -151,7 +151,9 @@ void dispatch(MeshBemtool *mesh, bemtool::Geometry *node, int VFBEM, Stack stack
         Assembly(B,ctx,ds.sparams,p1,p1,MPI_COMM_NULL,Mesh1::RdHat::d+1,ds.sym);
         PetscContainerCreate(PetscObjectComm((PetscObject)B->_petsc), &ptr);
         PetscContainerSetPointer(ptr, ctx);
-#if PETSC_VERSION_GE(3, 23, 0)
+#if PETSC_VERSION_GE(3, 24, 0)
+        PetscContainerSetCtxDestroy(ptr, (PetscCtxDestroyFn *)DestroyHtoolCtx<P,MeshBemtool>);
+#elif PETSC_VERSION_GE(3, 23, 0)
         PetscContainerSetCtxDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
 #else
         PetscContainerSetUserDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
@@ -202,7 +204,9 @@ void dispatch(MeshBemtool *mesh, bemtool::Geometry *node, int VFBEM, Stack stack
         Assembly(B,ctx,ds.sparams,p1,p1,MPI_COMM_NULL,Mesh1::RdHat::d+1,ds.sym);
         PetscContainerCreate(PetscObjectComm((PetscObject)B->_petsc), &ptr);
         PetscContainerSetPointer(ptr, ctx);
-#if PETSC_VERSION_GE(3, 23, 0)
+#if PETSC_VERSION_GE(3, 24, 0)
+        PetscContainerSetCtxDestroy(ptr, (PetscCtxDestroyFn *)DestroyHtoolCtx<P,MeshBemtool>);
+#elif PETSC_VERSION_GE(3, 23, 0)
         PetscContainerSetCtxDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
 #else
         PetscContainerSetUserDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
@@ -2992,7 +2996,11 @@ namespace PETSc {
           const OneOperator* codeM = op->Find(
             "(", ArrayOfaType(atype< long >( ), atype< double >( ), false));
           typename LinearSolver< Type >::MonF_O* mon = new typename LinearSolver< Type >::MonF_O(stack, codeM);
+#if PETSC_VERSION_GE(3, 24, 0)
+          KSPMonitorSet(ksp, Monitor< LinearSolver< Type > >, mon, (PetscCtxDestroyFn *)MonitorDestroy< Type >);
+#else
           KSPMonitorSet(ksp, Monitor< LinearSolver< Type > >, mon, MonitorDestroy< Type >);
+#endif
         }
       }
     }
