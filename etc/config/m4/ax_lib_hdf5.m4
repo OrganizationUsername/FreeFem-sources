@@ -241,10 +241,7 @@ HDF5 support is being disabled (equivalent to --with-hdf5=no).
         ff_hlib="";
         # remove -lhdf5 
         for arg  in $HDF5_LIBS; do if [ "-lhdf5" != "$arg" ] ;then ff_hlib="$ff_hlib $arg"; fi;done
-        HDF5_LIBS="-lhdf5 $ff_hlib" # add -lhdf5 
- #        test  "${HDF5_LIBS#*"-lhdf5"}" == "$HDF5_LIBS" && HDF5_LIBS="-lhdf5 $HDF5_LIBS"
- #       HDF5_LIBS="-lhdf5 $HDF5_LIBS"
- #   remove double -lhdf5
+        HDF5_LIBS="$ff_hlib -lhdf5" # add -lhdf5 
         AC_MSG_RESULT([yes (version $[HDF5_VERSION])])
 
         dnl See if we can compile

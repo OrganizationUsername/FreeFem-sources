@@ -261,7 +261,7 @@ int mylex::EatCommentAndSpace(string *data)
     do  // loop on type of comment !!
     {
        // cout << "incomment"<< incomment << " "<< int(c) << " " << c << endl;
-        ffassert(count++<100);
+        ffassert(count++<10000);
         eatspaces();
         // eat markdown <CR>~~~ or comment
         if(incomment==1 && (ifblock('~')==1 ||ifblock('`')==1 )) {

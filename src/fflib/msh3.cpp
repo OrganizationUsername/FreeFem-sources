@@ -5425,6 +5425,7 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
     int np = 0;    // nb of new points ..
     
     // first build old point to keep the numbering order for DDM ...
+    int err= 0;
     for (int i = 0, k = 0; i < Th.nv; i++) {
         if (takevertex[i] >= 0) {
             Vertex3 *pvi = gtree->ToClose(Th(i), hseuil,true);
@@ -5434,9 +5435,14 @@ MeshS *truncmesh(const MeshS &Th, const long &kksplit, int *split, bool WithMort
                 gtree->Add(vertices[np]);
                 np++;
             } else {
-                ffassert(0);
+                err++;
+                cout << " same  point ("<< i << " "<<  Th(i) <<"  == " << *pvi << " diff "<< R3(*pvi,Th(i)).norme()  << endl;
             }
         }
+    }
+    if(err){
+        cout << " double  point with eps ="<<hseuil<< endl;
+        ffassert(0);
     }
     
     KN< R3 > vertextrisub(nvsub);
