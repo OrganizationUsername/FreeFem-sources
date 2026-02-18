@@ -25,7 +25,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 ### Added
  Add support for ChangeNumbering with array of Mat and KNM
-
+ Add example of error indicator mesh adaptation in 3d see  examples/3d/adaptindicator3dP1.md
+ Add DG laplace problem in 1d  see examples/3dCurve/LapDG2-1d.edp
 ### Changed
 -
 
@@ -36,6 +37,10 @@ All notable changes to this project will be documented in this file.
 -
 
 ### Fixed
+    - missing check test in examples/3d with mmg plugins
+    - in meshL intallBE 
+    - correct P2ncL, P3ncL memory problem (typo)
+
     - trunc of surface mesh, a bug can occur in case on non manifold case (memory fault)
        (Thanks to PHT) 22/Sep/25, 24/Sep/25 recorrect because the basic trunc bugs (hard bug, conseptual ).
     - in formal operation in array  (ie [1]-[1] is not [0] but [2], same for "./" and ".*" operator  ) 3/Sep/25
