@@ -1902,7 +1902,7 @@ template<class R>
             for( int k=ti0;k<ti1;k++) {
                 if (all || setoflab.find(Th[k].lab) != setoflab.end()) {
                     for( int ie=0;ie<2;ie++)
-                    A += mate(k,ie,Th[k].lab,&parammatElement_OpVF);
+                    A += mate(k,ie,Th[k].lab,paramate);
                     if(sptrclean) sptrclean=sptr->clean();
                 }
             }
@@ -6868,7 +6868,7 @@ pmeshS  pThdi = GetAny<pmeshS>((*b->di->Th)(stack));
                     {
                         R cc  =  GetAny<R>(ll.second.eval(stack));
                         //cout << *(copt[il]) << " == " <<  cc << endl;
-                        CheckErrorOptimisation(cc,ccc,"Sorry error in Optimization (e) add:  int2d(Th,optimize=0)(...)");
+                        CheckErrorOptimisation(cc,ccc,"Sorry error in Optimization (e) add:  int1d(Th,optimize=0)(...)");
                         /*if ( ccc != cc) {
                          cerr << cc << " != " << ccc << " => ";
                          cerr << "Sorry error in Optimization (e) add:  int2d(Th,optimize=0)(...)" << endl;
@@ -6925,13 +6925,8 @@ pmeshS  pThdi = GetAny<pmeshS>((*b->di->Th)(stack));
            if ( copt && ( mat.optim==1) && Kv.number <1)
            {
                R cc  =  GetAny<R>(ll.second.eval(stack));
-               //cout << *(copt[il]) << " == " <<  cc << endl;
-               CheckErrorOptimisation(cc,ccc,"Sorry error in Optimization (e) add:  int2d(Th,optimize=0)(...)");
-               /*if ( ccc != cc) {
-                cerr << cc << " != " << ccc << " => ";
-                cerr << "Sorry error in Optimization (e) add:  int2d(Th,optimize=0)(...)" << endl;
-                ExecError("In Optimized version "); }*/
-           }
+               CheckErrorOptimisation(cc,ccc,"Sorry error in Optimization (e) add:  intallBE(Th,optimize=0)(...)");
+            }
            int fi=Kv.dfcbegin(icomp);
            int li=Kv.dfcend(icomp);
            int fj=Ku.dfcbegin(jcomp);

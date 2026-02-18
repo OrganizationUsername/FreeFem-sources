@@ -67,7 +67,7 @@ TESTS_TETGEN = cylinder.edp \
 	tetgenholeregion.md
 
 TESTS_TETGEN_MMG = Sphere-Isocahedron.md Period-Poisson-cube-ballon.md \
-	sphereincube.md
+	sphereincube.md adaptindicator3dP1.md
 
 TESTS_TETGEN_MMG_MSHMET = Laplace-Adapt-aniso-3d.md
 
