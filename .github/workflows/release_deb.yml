@@ -1,0 +1,63 @@
+# Call the corresponding build workflow with the proper arguments:
+# - Build_type: Release
+# - Upload build_tree: true
+name: Release .deb
+
+on:
+  workflow_call:
+    inputs:
+      release_version:
+        description: 'Release version number'
+        required: true
+        type: string
+      ubuntu_versions:
+        description: 'Ubuntu versions as JSON array'
+        required: true
+        type: string
+
+jobs:
+  build_freefem_ubuntu:
+    uses: ./.github/workflows/full-mpich.yml
+    with:
+      ubuntu_versions: ${{ inputs.ubuntu_versions }}
+      build_types: '["release"]'
+      skip_check: true
+      skip_macos: true
+      upload_build_artifacts: true
+
+  package_freefem:
+    needs: build_freefem_ubuntu
+    runs-on: ubuntu-${{ matrix.ubuntu_version }}
+    strategy:
+      matrix:
+        ubuntu_version: ${{ fromJSON(inputs.ubuntu_versions) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version variables
+        id: version
+        run: |
+          VERSION="${{ inputs.release_version }}"
+          RELEASE_TAG_NAME="v$VERSION"
+          echo "release_tag_name=$RELEASE_TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+          echo "Release tag name: $RELEASE_TAG_NAME"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: install_tree_${{ matrix.ubuntu_version }}
+          path: ./artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Untar artifact and package .deb
+        run: |
+          mkdir ./install_tree
+          tar xzf ./artifacts/install_tree.tar.gz -C ./install_tree/
+          bash etc/actions/releases/package_deb_ubuntu.sh \
+            ./install_tree ${{ inputs.release_version }}
+
+      - name: Upload .deb as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: v${{ inputs.release_version }}-ubuntu-${{ matrix.ubuntu_version }}
+          path: ./*.deb
