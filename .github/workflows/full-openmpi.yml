@@ -134,7 +134,7 @@ jobs:
         if: ${{ inputs.upload_build_artifacts == true }}
         run: |
           cd ${{ steps.flags.outputs.staging-dir }}/${{ env.INSTALL_DIR }}
-          tar czf ${{ github.workspace }}/install_tree.tar.gz
+          tar czf ${{ github.workspace }}/install_tree.tar.gz .
 
       - name: Upload
         if: ${{ inputs.upload_build_artifacts == true }}
