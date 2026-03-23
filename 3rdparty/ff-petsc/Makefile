@@ -39,6 +39,9 @@ ifeq ($(FC),)
 PETSC_OPENBLAS := --download-f2cblaslapack
 else
 PETSC_OPENBLAS := --download-openblas
+ifeq ($(FF_generic_petsc), yes)
+PETSC_OPENBLAS += --download-openblas-make-options=TARGET=GENERIC
+endif
 endif
 PETSC_OPENBLAS_C := --with-blaslapack-dir=$(DIR_INSTALL_REAL)
 else

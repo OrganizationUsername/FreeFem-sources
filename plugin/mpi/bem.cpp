@@ -696,8 +696,6 @@ AnyType OpHMatrixtoBEMForm<R,MMesh,v_fes1,v_fes2>::Op::operator()(Stack stack)  
     typedef typename v_fes2::pfes pfes2;
     typedef typename v_fes1::FESpace FESpace1;
     typedef typename v_fes2::FESpace FESpace2;
-    typedef typename FESpace1::Mesh SMesh;
-    typedef typename FESpace2::Mesh TMesh;
     
     
     assert(b && b->nargs);
