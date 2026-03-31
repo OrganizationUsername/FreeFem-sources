@@ -9,7 +9,12 @@
 
 #ifdef WITH_SLEPC
 
-#include "slepc.h"
+#include <slepc.h>
+
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wunused-value"
+#endif
 
 namespace SLEPc {
 template<class Type, class K>
@@ -21,14 +26,14 @@ using User = typename std::conditional<!std::is_same<SType, NEP>::value, _n_User
 template<class Type, class K, class SType>
 static PetscErrorCode MatMult_User(Mat A, Vec x, Vec y);
 template<class K, typename std::enable_if<std::is_same<K, double>::value || !std::is_same<PetscScalar, double>::value>::type* = nullptr>
-void copy(K* pt, PetscInt n, PetscScalar* xr, PetscScalar* xi) { }
+void copy(K*, PetscInt, PetscScalar*, PetscScalar*) { }
 template<class K, typename std::enable_if<!std::is_same<K, double>::value && std::is_same<PetscScalar, double>::value>::type* = nullptr>
 void copy(K* pt, PetscInt n, PetscScalar* xr, PetscScalar* xi) {
     for(int i = 0; i < n; ++i)
         pt[i] = K(xr[i], xi[i]);
 }
 template<class SType, class K, typename std::enable_if<!std::is_same<SType, SVD>::value && (std::is_same<K, double>::value || !std::is_same<PetscScalar, double>::value)>::type* = nullptr>
-void assign(K* pt, PetscScalar& kr, PetscScalar& ki) {
+void assign(K* pt, PetscScalar& kr, PetscScalar&) {
     *pt = kr;
 }
 template<class SType, class K, typename std::enable_if<!std::is_same<SType, SVD>::value && (!std::is_same<K, double>::value && std::is_same<PetscScalar, double>::value)>::type* = nullptr>
@@ -36,9 +41,9 @@ void assign(K* pt, PetscScalar& kr, PetscScalar& ki) {
     *pt = K(kr, ki);
 }
 template<class SType, class K, typename std::enable_if<std::is_same<SType, SVD>::value>::type* = nullptr>
-void assign(K* pt, PetscScalar& kr, PetscScalar& ki) { }
+void assign(K*, PetscScalar&, PetscScalar&) { }
 template<class K, typename std::enable_if<(std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value)>::type* = nullptr>
-void distributedVec(PetscInt* num, PetscInt first, PetscInt last, K* const in, PetscScalar* pt, PetscInt n) { }
+void distributedVec(PetscInt*, PetscInt, PetscInt, K* const, PetscScalar*, PetscInt) { }
 template<class K, typename std::enable_if<!(std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value)>::type* = nullptr>
 void distributedVec(PetscInt* num, PetscInt first, PetscInt last, K* const in, PetscScalar* pt, PetscInt n) {
     HPDDM::Subdomain<K>::template distributedVec<0>(num, first, last, in, pt, n, 1);
@@ -57,7 +62,7 @@ class eigensolver : public OneOperator {
                 typedef typename RNM_VirtualMatrix<PetscScalar>::plusAx plusAx;
                 MatF_O(int n, Stack stk, const OneOperator* op) :
                     RNM_VirtualMatrix<PetscScalar>(n), stack(stk), x(n), c_x(CPValue(x)),
-                    mat(op ? CastTo<Kn_>(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : 0) { }
+                    mat(op ? CastTo<Kn_>(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : nullptr) { }
                 ~MatF_O() {
                     delete mat;
                     Expression zzz = c_x;
@@ -79,7 +84,7 @@ class eigensolver : public OneOperator {
                 Expression mat;
                 ScalarF_O(Stack stk, const OneOperator* op)
                     : stack(stk), x(0), c_x(CPValue(x)),
-                    mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : 0) {}
+                    mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : nullptr) {}
                 ~ScalarF_O( ) {
                     delete mat;
                     Expression zzz = c_x;
@@ -101,10 +106,10 @@ class eigensolver : public OneOperator {
                 Expression B;
                 const OneOperator* codeA, *codeB;
                 const int c;
-                static const int n_name_param = 11;
+                static const int n_name_param = 13;
                 static basicAC_F0::name_and_type name_param[];
                 Expression nargs[n_name_param];
-                E_eigensolver(const basicAC_F0& args, int d) : A(0), B(0), codeA(0), codeB(0), c(d) {
+                E_eigensolver(const basicAC_F0& args, int d) : A(nullptr), B(nullptr), codeA(nullptr), codeB(nullptr), c(d) {
                     args.SetNameParam(n_name_param, name_param, nargs);
                     if(c != 4) {
                         A = to<Type*>(args[0]);
@@ -151,10 +156,12 @@ basicAC_F0::name_and_type eigensolver<Type, K, SType>::E_eigensolver::name_param
     {!std::is_same<SType, SVD>::value ? "array" : "larray", &typeid(KNM<K>*)},
     {"fields", &typeid(KN<double>*)},
     {"names", &typeid(KN<String>*)},
-    {!std::is_same<SType, SVD>::value ? "schurPreconditioner" : "rvectors", !std::is_same<SType, SVD>::value ? &typeid(KN<Matrice_Creuse<upscaled_type<PetscScalar>>>*) : &typeid(FEbaseArrayKn<K>*)},
-    {!std::is_same<SType, SVD>::value ? "schurList" : "rarray", !std::is_same<SType, SVD>::value ? &typeid(KN<double>*) : &typeid(KNM<K>*)},
+    {!std::is_same<SType, SVD>::value ? "lvectors" : "rvectors", &typeid(FEbaseArrayKn<K>*)},
+    {!std::is_same<SType, SVD>::value ? "larray" : "rarray", &typeid(KNM<K>*)},
     {"deflation", &typeid(KNM<PetscScalar>*)},
     {"errorestimate", &typeid(KN<PetscReal>*)},
+    {"schurPreconditioner", &typeid(KN<Matrice_Creuse<upscaled_type<PetscScalar>>>*)},
+    {"schurList", &typeid(KN<double>*)},
 };
 template<class Type, class K, class SType>
 struct _n_User {
@@ -165,7 +172,7 @@ struct _m_User {
     typename eigensolver<Type, K, NEP>::ScalarF_O* F;
     typename eigensolver<Type, K, NEP>::ScalarF_O* J;
 };
-PetscErrorCode FormFun(NEP nep, PetscScalar lambda, Mat F, Mat P, void* ctx) {
+PetscErrorCode FormFun(NEP, PetscScalar lambda, Mat, Mat, void* ctx) {
     User<PETSc::DistributedCSR<HpSchwarz<PetscScalar>>, PetscScalar, NEP>* user;
 
     PetscFunctionBeginUser;
@@ -176,7 +183,7 @@ PetscErrorCode FormFun(NEP nep, PetscScalar lambda, Mat F, Mat P, void* ctx) {
     f->apply(lambda, &ret);
     PetscFunctionReturn(PetscErrorCode(ret));
 }
-PetscErrorCode FormJac(NEP nep, PetscScalar lambda, Mat J, void* ctx) {
+PetscErrorCode FormJac(NEP, PetscScalar lambda, Mat, void* ctx) {
     User<PETSc::DistributedCSR<HpSchwarz<PetscScalar>>, PetscScalar, NEP>* user;
 
     PetscFunctionBeginUser;
@@ -217,6 +224,7 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
             User<Type, K, NEP> func = nullptr;
             MatType type;
             PetscBool isType;
+            PetscBool isTwoSided;
             MatGetType(ptA->_petsc, &type);
             PetscStrcmp(type, MATNEST, &isType);
             PetscInt m;
@@ -242,7 +250,7 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                     PetscNew(&user);
                     user->mat = new typename eigensolver<Type, K, typename std::conditional<std::is_same<SType, NEP>::value, EPS, SType>::type>::MatF_O(m, stack, codeA);
                     MatCreateShell(PetscObjectComm((PetscObject)ptA->_petsc), m, m, M, M, user, &S);
-                    MatShellSetOperation(S, MATOP_MULT, (void (*)(void))MatMult_User<Type, K, typename std::conditional<std::is_same<SType, NEP>::value, EPS, SType>::type>);
+                    MatShellSetOperation(S, MATOP_MULT, (PetscErrorCodeFn *)MatMult_User<Type, K, typename std::conditional<std::is_same<SType, NEP>::value, EPS, SType>::type>);
                     if(std::is_same<SType, EPS>::value)
                         EPSSetOperators(eps, S, NULL);
                     else if(std::is_same<SType, SVD>::value)
@@ -292,22 +300,19 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                     PetscBool isFieldSplit;
                     PetscStrcmp(type, PCFIELDSPLIT, &isFieldSplit);
                     if(isFieldSplit) {
-                        KN<double>* fields = nargs[5] ? GetAny<KN<double>*>((*nargs[5])(stack)) : 0;
-                        KN<String>* names = nargs[6] ? GetAny<KN<String>*>((*nargs[6])(stack)) : 0;
-                        KN<Matrice_Creuse<upscaled_type<PetscScalar>>>* mS = nargs[7] ? GetAny<KN<Matrice_Creuse<upscaled_type<PetscScalar>>>*>((*nargs[7])(stack)) : 0;
-                        KN<double>* pL = nargs[8] ? GetAny<KN<double>*>((*nargs[8])(stack)) : 0;
-                        if(fields && names) {
-                            KSP ksp;
-                            STGetKSP(st, &ksp);
-                            KSPSetOperators(ksp, ptA->_petsc, ptA->_petsc);
-                            setFieldSplitPC(ptA, ksp, fields, names, mS, pL);
-                            EPSSetUp(eps);
-                            if(ptA->_vS && !ptA->_vS->empty()) {
-                                PC pc;
-                                KSPGetPC(ksp, &pc);
-                                PCSetUp(pc);
-                                PETSc::setCompositePC(pc, ptA->_vS);
-                            }
+                        KN<double>* fields = nargs[5] ? GetAny<KN<double>*>((*nargs[5])(stack)) : nullptr;
+                        KN<String>* names = nargs[6] ? GetAny<KN<String>*>((*nargs[6])(stack)) : nullptr;
+                        KN<Matrice_Creuse<upscaled_type<PetscScalar>>>* mS = nargs[11] ? GetAny<KN<Matrice_Creuse<upscaled_type<PetscScalar>>>*>((*nargs[11])(stack)) : nullptr;
+                        KN<double>* pL = nargs[12] ? GetAny<KN<double>*>((*nargs[12])(stack)) : nullptr;
+                        STGetKSP(st, &ksp);
+                        KSPSetOperators(ksp, ptA->_petsc, ptA->_petsc);
+                        setFieldSplitPC(ptA, ksp, fields, names, mS, pL);
+                        EPSSetUp(eps);
+                        if(ptA->_vS && !ptA->_vS->empty()) {
+                            PC pc;
+                            KSPGetPC(ksp, &pc);
+                            PCSetUp(pc);
+                            PETSc::setCompositePC(pc, ptA->_vS);
                         }
                     }
                 }
@@ -343,9 +348,31 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                 }
                 eigenvectors->resize(0);
             }
+            FEbaseArrayKn<K>* othervectors = nargs[7] ? GetAny<FEbaseArrayKn<K>*>((*nargs[7])(stack)) : nullptr;
+            Vec* otherbasis = nullptr;
+            PetscInt othern = 0;
+            if(othervectors) {
+                ffassert(!isType);
+                if(othervectors->N > 0 && othervectors->get(0) && othervectors->get(0)->n > 0) {
+                    othern = othervectors->N;
+                    otherbasis = new Vec[othern];
+                    for(int i = 0; i < othern; ++i) {
+                        MatCreateVecs(ptA->_petsc, &otherbasis[i], NULL);
+                        PetscScalar* pt;
+                        VecGetArray(otherbasis[i], &pt);
+                        if(!(std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value))
+                            distributedVec(ptA->_num, ptA->_first, ptA->_last, static_cast<K*>(*(othervectors->get(i))), pt, othervectors->get(i)->n);
+                        VecRestoreArray(otherbasis[i], &pt);
+                    }
+                }
+                othervectors->resize(0);
+            }
             if(std::is_same<SType, EPS>::value) {
+                EPSGetTwoSided(eps, &isTwoSided);
                 if(n)
                     EPSSetInitialSpace(eps, n, basis);
+                if(othern && isTwoSided)
+                    EPSSetLeftInitialSpace(eps, othern, otherbasis);
                 KNM<PetscScalar>* ptDeflation = nargs[9] ? GetAny<KNM<PetscScalar>*>((*nargs[9])(stack)) : NULL;
                 if(ptDeflation && ptDeflation->M()) {
                     PetscInt m;
@@ -362,8 +389,7 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                 EPSSolve(eps);
             }
             else if(std::is_same<SType, SVD>::value) {
-                if(n)
-                    SVDSetInitialSpaces(svd, n, basis, 0, NULL);
+                SVDSetInitialSpaces(svd, othern, otherbasis, n, basis);
                 SVDSolve(svd);
             }
             else if(std::is_same<SType, NEP>::value) {
@@ -379,6 +405,9 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
             for(int i = 0; i < n; ++i)
                 VecDestroy(&basis[i]);
             delete [] basis;
+            for(int i = 0; i < othern; ++i)
+                VecDestroy(&otherbasis[i]);
+            delete [] otherbasis;
             PetscInt nconv;
             if(std::is_same<SType, EPS>::value)
                 EPSGetConverged(eps, &nconv);
@@ -388,65 +417,81 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                 NEPGetConverged(nep, &nconv);
             else
                 PEPGetConverged(pep, &nconv);
-            if(nconv > 0 && ((nargs[2] || nargs[3] || nargs[4]) || (std::is_same<SType, SVD>::value && (nargs[7] || nargs[8])))) {
+            if(nconv > 0 && ((nargs[2] || nargs[3] || nargs[4]) || ((std::is_same<SType, SVD>::value || (std::is_same<SType, EPS>::value && isTwoSided)) && (nargs[7] || nargs[8])))) {
                 KN<typename std::conditional<!std::is_same<SType, SVD>::value, K, PetscReal>::type>* eigenvalues = nargs[2] ? GetAny<KN<typename std::conditional<!std::is_same<SType, SVD>::value, K, PetscReal>::type>*>((*nargs[2])(stack)) : nullptr;
                 KN<PetscReal>* errorestimate = nargs[10] ? GetAny<KN<PetscReal>*>((*nargs[10])(stack)) : nullptr;
-                KNM<K>* array = nargs[4] ? GetAny<KNM<K>*>((*nargs[4])(stack)) : nullptr;
-                FEbaseArrayKn<K>* rvectors = std::is_same<SType, SVD>::value && nargs[7] ? GetAny<FEbaseArrayKn<K>*>((*nargs[7])(stack)) : nullptr;
-                KNM<K>* rarray = std::is_same<SType, SVD>::value && nargs[8] ? GetAny<KNM<K>*>((*nargs[8])(stack)) : nullptr;
+                KNM<K>* eigenarray = nargs[4] ? GetAny<KNM<K>*>((*nargs[4])(stack)) : nullptr;
+                KNM<K>* otherarray = nargs[8] ? GetAny<KNM<K>*>((*nargs[8])(stack)) : nullptr;
                 if(eigenvalues)
                     eigenvalues->resize(nconv);
                 if(eigenvectors && !isType)
                     eigenvectors->resize(nconv);
-                if(rvectors && !isType)
-                    rvectors->resize(nconv);
+                if(othervectors && !isType)
+                    othervectors->resize(nconv);
                 if(errorestimate)
                     errorestimate->resize(nconv);
-                if(array)
-                    array->resize(m, nconv);
-                Vec xr, xi;
+                if(eigenarray)
+                    eigenarray->resize(m, nconv);
+                Vec xr, xi, yr, yi;
                 PetscInt n, nr;
-                if(eigenvectors || array || rvectors || rarray) {
+                if(eigenvectors || eigenarray || othervectors || otherarray) {
                     MatCreateVecs(ptA->_petsc, &xi, &xr);
                     VecGetLocalSize(xi, &nr);
-                    if(rarray)
-                        rarray->resize(nr, nconv);
+                    if(otherarray)
+                        otherarray->resize(nr, nconv);
                     VecGetLocalSize(xr, &n);
                 } else xr = xi = NULL;
+                if(std::is_same<SType, EPS>::value && (othervectors || otherarray))
+                    MatCreateVecs(ptA->_petsc, &yi, &yr);
+                else yr = yi = NULL;
                 for(PetscInt i = 0; i < nconv; ++i) {
                     PetscScalar kr, ki = 0;
                     PetscReal sigma;
                     PetscReal errest;
                     if(std::is_same<SType, EPS>::value) {
-                        EPSGetEigenpair(eps, i, &kr, &ki, (eigenvectors || array) ? xr : NULL, (eigenvectors || array) && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value ? xi : NULL);
+                        EPSGetEigenpair(eps, i, &kr, &ki, (eigenvectors || eigenarray) ? xr : NULL, (eigenvectors || eigenarray) && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value ? xi : NULL);
+                        if((othervectors || otherarray) && isTwoSided)
+                            EPSGetLeftEigenvector(eps, i, yr, yi);
                         if(errorestimate)
                             EPSGetErrorEstimate(eps, i, &errest);
                     }
                     else if(std::is_same<SType, SVD>::value)
                         SVDGetSingularTriplet(svd, i, &sigma, xr, xi);
                     else if(std::is_same<SType, NEP>::value) {
-                        NEPGetEigenpair(nep, i, &kr, &ki, (eigenvectors || array) ? xr : NULL, (eigenvectors || array) && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value ? xi : NULL);
+                        NEPGetEigenpair(nep, i, &kr, &ki, (eigenvectors || eigenarray) ? xr : NULL, (eigenvectors || eigenarray) && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value ? xi : NULL);
                         if(errorestimate)
                             NEPGetErrorEstimate(nep, i, &errest);
                     }
                     else {
-                        PEPGetEigenpair(pep, i, &kr, &ki, (eigenvectors || array) ? xr : NULL, (eigenvectors || array) && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value ? xi : NULL);
+                        PEPGetEigenpair(pep, i, &kr, &ki, (eigenvectors || eigenarray) ? xr : NULL, (eigenvectors || eigenarray) && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value ? xi : NULL);
                         if(errorestimate)
                             PEPGetErrorEstimate(pep, i, &errest);
                     }
-                    if(eigenvectors || array || rvectors || rarray) {
+                    if(eigenvectors || eigenarray || othervectors || otherarray) {
                         PetscScalar* tmpr;
                         PetscScalar* tmpi;
+                        PetscScalar* tmp2r;
+                        PetscScalar* tmp2i;
                         VecGetArray(xr, &tmpr);
+                        if(std::is_same<SType, EPS>::value && (othervectors || otherarray))
+                            VecGetArray(yr, &tmp2r);
                         K* pt, *pti;
                         if(!std::is_same<SType, SVD>::value) {
                             if(std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value) {
                                 VecGetArray(xi, &tmpi);
                                 pt = new K[n];
                                 copy(pt, n, tmpr, tmpi);
+                                if(std::is_same<SType, EPS>::value && (othervectors || otherarray)) {
+                                    VecGetArray(yi, &tmp2i);
+                                    pti = new K[nr];
+                                    copy(pti, nr, tmp2r, tmp2i);
+                                }
                             }
-                            else
+                            else {
                                 pt = reinterpret_cast<K*>(tmpr);
+                                if(std::is_same<SType, EPS>::value && (othervectors || otherarray))
+                                    pti = reinterpret_cast<K*>(tmp2r);
+                            }
                         }
                         else {
                             pt = reinterpret_cast<K*>(tmpr);
@@ -463,11 +508,11 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                                 ptA->_exchange[0]->HPDDM::template Subdomain<PetscScalar>::exchange(static_cast<K*>(cpy));
                             if(eigenvectors)
                                 eigenvectors->set(i, cpy);
-                            if(array && !codeA) {
+                            if(eigenarray && !codeA) {
                                 KN<K> cpy(m, pt);
-                                (*array)(':', i) = cpy;
+                                (*eigenarray)(':', long(i)) = cpy;
                             }
-                            if(std::is_same<SType, SVD>::value) {
+                            if(std::is_same<SType, SVD>::value || (std::is_same<SType, EPS>::value && (othervectors || otherarray) && isTwoSided)) {
                                 KN<K> cpy(ptA->_cnum && ptA->_exchange[1] ? ptA->_exchange[1]->getDof() : (ptA->_A ? ptA->_A->getDof() : 0));
                                 cpy = K(0.0);
                                 if(ptA->_cnum && ptA->_exchange[1]) {
@@ -480,28 +525,35 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                                 }
                                 else
                                     ffassert(0);
-                                if(rvectors)
-                                    rvectors->set(i, cpy);
-                                if(rarray && !codeA) {
+                                if(othervectors)
+                                    othervectors->set(i, cpy);
+                                if(otherarray && !codeA) {
                                     KN<K> cpy(nr, pti);
-                                    (*rarray)(':', i) = cpy;
+                                    (*otherarray)(':', long(i)) = cpy;
                                 }
                             }
                         }
                         if(codeA || isType || !ptA->_A) {
-                            if(array) {
+                            if(eigenarray) {
                                 KN<K> cpy(m, pt);
-                                (*array)(':', i) = cpy;
+                                (*eigenarray)(':', long(i)) = cpy;
                             }
-                            if(rarray) {
+                            if(otherarray) {
                                 KN<K> cpy(nr, pti);
-                                (*rarray)(':', i) = cpy;
+                                (*otherarray)(':', long(i)) = cpy;
                             }
                         }
-                        if(!std::is_same<SType, SVD>::value && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value)
+                        if(!std::is_same<SType, SVD>::value && std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value) {
                             delete [] pt;
-                        if(std::is_same<SType, SVD>::value || (std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value))
+                            delete [] pti;
+                        }
+                        if(std::is_same<SType, SVD>::value || (std::is_same<PetscScalar, double>::value && std::is_same<K, std::complex<double>>::value)) {
                             VecRestoreArray(xi, &tmpi);
+                            if(std::is_same<SType, EPS>::value && (othervectors || otherarray))
+                                VecRestoreArray(yi, &tmp2i);
+                        }
+                        if(std::is_same<SType, EPS>::value && (othervectors || otherarray))
+                            VecRestoreArray(yr, &tmp2r);
                         VecRestoreArray(xr, &tmpr);
                     }
                     if(eigenvalues) {
@@ -513,9 +565,11 @@ AnyType eigensolver<Type, K, SType>::E_eigensolver::operator()(Stack stack) cons
                     if(errorestimate)
                         errorestimate->operator[](i) = errest;
                 }
-                if(eigenvectors || array || rvectors || rarray) {
+                if(eigenvectors || eigenarray || othervectors || otherarray) {
                     VecDestroy(&xr);
                     VecDestroy(&xi);
+                    VecDestroy(&yr);
+                    VecDestroy(&yi);
                 }
             }
             if(user) {
@@ -600,7 +654,7 @@ static void Init() {
         PetscInitialized(&isInitialized);
         if(!isInitialized && mpirank == 0)
             std::cout << "PetscInitialize has not been called, do not forget to load PETSc before loading SLEPc" << std::endl;
-        SlepcInitialize(&argc, &argv, 0, "");
+        SlepcInitialize(&argc, &argv, nullptr, "");
         delete [] argv;
         ff_atend(SLEPc::finalizeSLEPc);
         SLEPc::addSLEPc<PetscScalar>();
@@ -621,4 +675,8 @@ static void Init() {
 static void Init() {
      Init_PETSc();
 }
+#endif
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
 #endif

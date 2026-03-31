@@ -952,7 +952,7 @@ class OneBinaryOperatorRNM_inv : public OneOperator {
     long pv = GetAny< long >((*p)(0));
     if (pv != -1) {
       char buf[100];
-      sprintf(buf, " A^%ld, The pow must be  == -1, sorry", pv);
+      snprintf(buf, sizeof(buf), " A^%ld, The pow must be  == -1, sorry", pv);
       CompileError(buf);
     }
 
@@ -1022,7 +1022,7 @@ KNM< R > *Solve(KNM< R > *a, Inverse< KNM< R > * > b) {
 
   dgesv_(&n, &n, B, &n, p, *a, &n, &info);
   if (info) {
-    cerr << " error:  dgesv_  (not invertible ??) " << info << endl;
+    cerr << " error:  dgesv_  (not invertible ?\?) " << info << endl;
       ErrorExec("dgesv_",1);
       std::abort();
   }
@@ -1302,6 +1302,9 @@ KNM< R > *mult(KNM< R > *a, Mult< KNM< R > * > bc) {
     cout << lsa << " " << lsb << " " << lsc << " init " << init << endl;
     cout << lda << " " << ldb << " " << ldc << endl;
   }
+    ffassert( C00 != A00);
+    ffassert( C00 != B00);
+
   M = C.N();
   N = C.M();
   K = bc.ta == 0 ? A.M() : A.N();

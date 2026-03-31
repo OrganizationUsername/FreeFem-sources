@@ -359,6 +359,7 @@ if(err==0)
   cout << " th max mesh size = h = " << th.hmax << endl;
   cout << " th min mesh size     = " << th.hmin<< endl;
 }
+/* wrong code I skip to day  17 nov 2025 
 {
 	include "movemeshsmooth.idp"
 	mesh Th=square(3,3);
@@ -367,7 +368,7 @@ if(err==0)
 	fespace Vh(Th,P1); 
 
 	Vh u=x,v=y;
-	verbosity=5;// 1000 debbug => plot 
+	verbosity=10000;// 1000 debbug => plot 
 	Th=movemeshsmooth(Th,lab,u[],v[],100);
 	verbosity=1;
-}
+}*/

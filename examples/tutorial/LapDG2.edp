@@ -27,7 +27,7 @@ mesh Th = square(10,10); // unite square
 fespace Vh(Th,P2dc);     // Discontinous P2 finite element
 fespace Xh(Th,P2);
 //  if pena = 0 => Vh must be P2 otherwise we need some penalisation  
-real pena=100; // a paramater to add penalisation 
+real pena=0; // a paramater to add penalisation 
 
 func f=x+2*y;
 func g=x-y;

@@ -1,19 +1,36 @@
+macro ffddmdeflateglobalvector(pr,u)
+if (pr#prfe#prmesh#isincomm)
+{
+pr#Z.resize(pr#Z.n+1);
+if (!pr#prfe#prmesh#excluded) {
+  assert(u.n == pr#prfe#Vhi.ndof);
+  pr#Z[pr#Z.n-1].resize(u.n);
+  pr#Z[pr#Z.n-1] = u;
+}
+else
+  pr#Z[pr#Z.n-1].resize(pr#prfe#Vhi.ndof);
+pr#sg++;
+}
+// EOM
+
 macro ffddmbuildZTAZ(prT,pr,Varf)
 
 if (pr#prfe#prmesh#isincomm)
 {
 pr#prfe#prmesh#tic(pr#tloc)
 
+pr#E.clear;
+
 if (!bpara) {
   assert (Stringification(prT) == Stringification(pr)); /* TODO */
-  pr#ncoarsespace=pr#si;
+  pr#ncoarsespace = pr#si + pr#sg; /* local and global deflation vectors */
   if (mpiRank(pr#prfe#prmesh#mpicomm) == 0)
     cout << "["+Stringification(pr)+"] CS size = " << pr#ncoarsespace << endl;
-  pr#sizelg = sizel;	/* sizelg stores the number of ev for every subdomain */
 }
 else {
   pr#ncoarsespace = 0; /* coarse space dimension */
   mpiAllReduce(pr#si,pr#ncoarsespace,pr#prfe#prmesh#mpicomm,mpiSUM);
+  pr#ncoarsespace += pr#sg; /* add global deflation vectors */
 }
 
 if (pr#ncoarsespace > 0)
@@ -23,11 +40,17 @@ if (!bpara) {
   /* the 2 fors loop over the columns of Z subdomainwise */
   for (int jj=0; jj<pr#prfe#prmesh#npart; jj++)
   for (int ii=0; ii < pr#sizelg[jj]; ii++) {
-  	pr#prfe#K[int] tmp(pr#prfe#Rih[jj].m); /*tmp(pr#prfe#Rih[jj].m);
-    */ tmp = pr#prfe#Rih[jj]'*pr#Z[cpt];
+    pr#prfe#K[int] tmp(pr#prfe#Rih[jj].m);
+    tmp = pr#prfe#Rih[jj]'*pr#Z[cpt];
     Zm(:,cpt) = tmp;
     cpt++; /* keeps track of the global numbering of the columns of Z */
   }
+  /* global deflation vectors */
+  for (int ii=0; ii < pr#sg; ii++) {
+    Zm(:,cpt) = pr#Z[cpt];
+    cpt++;
+  }
+
   matrix<pr#prfe#K> Zms = Zm;
   matrix<pr#prfe#K> tmp = pr#Aglobal*Zms;
   pr#E = Zms'*tmp;
@@ -36,10 +59,7 @@ if (!bpara) {
 else {
   /* Assemble E on proc 0
      see PhD thesis of P.Jolivet pag 46 and following */
-  	
-  pr#sizelg = 0;
-  mpiAllReduce(sizel,pr#sizelg,pr#prfe#prmesh#mpicomm,mpiSUM); /* sizelg stores the number of ev for every subdomain */
-    
+
   pr#offseti = 0; /* offseti[i]: index of the first ev of the subdomain i in the global numbering of the columns of Z */
   for (int ii=0; ii < pr#prfe#prmesh#npart; ii++)
     pr#offseti[ii] = (ii == 0 ? 0 : pr#offseti[ii-1] + pr#sizelg[ii-1]);
@@ -64,6 +84,7 @@ else {
   /* PRT */
   prT#ncoarsespace = 0; /* coarse space dimension */
   mpiAllReduce(prT#si,prT#ncoarsespace,prT#prfe#prmesh#mpicomm,mpiSUM);
+  prT#ncoarsespace += prT#sg; /* add global deflation vectors */
   if (mpiRank(prT#prfe#prmesh#mpicomm) == 0)
     cout << "["+Stringification(pr)+"] CS size = " << pr#ncoarsespace << " x " << prT#ncoarsespace << endl;
 
@@ -71,9 +92,7 @@ else {
      see PhD thesis of P.Jolivet pag 46 and following */
 
   if (Stringification(prT) == Stringification(pr))
-    sizelT = sizel;
-  prT#sizelg = 0;
-  mpiAllReduce(sizelT,prT#sizelg,prT#prfe#prmesh#mpicomm,mpiSUM); /* sizelg stores the number of ev for every subdomain */
+    prT#sizelg = pr#sizelg;
 
   prT#offseti = 0; /* offseti[i]: index of the first ev of the subdomain i in the global numbering of the columns of Z */
   for (int ii=0; ii < prT#prfe#prmesh#npart; ii++)
@@ -97,14 +116,18 @@ else {
   }
 
   pr#prfe#K[int,int] AiZmi(1,1); /* A_i Z_i */
+  pr#prfe#K[int,int] AZmg(1,1); /* A Z_g for global deflation vectors */
   
   IFMACRO(pr#localmacrominoverlap,1)
   ffddmsetupOperator(localprAug, pr#prfe#Aug, Varf)
   ;
   ENDIFMACRO
 
-  if (!pr#prfe#prmesh#excluded)
+  if (!pr#prfe#prmesh#excluded && pr#si > 0)
     AiZmi.resize(pr#prfegeneo#Dk[mpiRank(pr#prfegeneo#prmesh#commddm)].n,pr#si);
+  int ni = pr#prfe#prmesh#excluded ? pr#prfe#Vhi.ndof : pr#prfegeneo#Dk[mpiRank(pr#prfegeneo#prmesh#commddm)].n;
+  if (pr#sg > 0)
+    AZmg.resize(ni,pr#sg);
   
   for (int ii=0; ii < pr#si; ii++) {
     IFMACRO(pr#localmacrominoverlap,1)
@@ -124,12 +147,18 @@ else {
     AiZmi(:,ii) = tmp;
   }
 
+  for (int ii=0; ii < pr#sg; ii++)
+    AZmg(:,ii) = pr#A(pr#Z[pr#si+ii]);
+
   /* step 3 of P.Jolivet thesis (page 47) */
   pr#prfe#K[int,int][int] mrcv(pr#prfegeneo#prmesh#numberIntersection);
   pr#prfe#K[int,int][int] msnd(pr#prfegeneo#prmesh#numberIntersection);
 
   pr#prfe#K[int,int] Eii(prT#si,pr#si);
   pr#prfe#K[int,int][int] Eij(pr#prfegeneo#prmesh#numberIntersection);
+
+  pr#prfe#K[int,int] Egg(prT#sg,pr#sg);
+  pr#prfe#K[int,int] Eig(prT#si,pr#sg);
 
   if (!pr#prfe#prmesh#excluded) {  
 	  mpiRequest[int] rq(pr#prfegeneo#prmesh#numberIntersection*2);
@@ -153,13 +182,17 @@ else {
 	  for (int jj=0; jj < pr#si; jj++) {
 	    IFMACRO(pr#localmacrominoverlap,1)
 	    pr#prfe#K[int] tmp = pr#prfegeneo#interp*AiZmi(:,jj);
-	    Eii(ii,jj) = pr#Z[ii]'*tmp;
+	    Eii(ii,jj) = prT#Z[ii]'*tmp;
 	    ENDIFMACRO
 	    IFMACRO(pr#localmacrominoverlap,0)
 	    Eii(ii,jj) = prT#Z[ii]'*AiZmi(:,jj);
 	    ENDIFMACRO
 	  }
-	  
+
+    if (pr#regularizeE)
+    for (int ii=0; ii<Eii.n; ii++)
+      Eii(ii,ii) += pr#regularizeE;
+
 	  /* step 5 of P.Jolivet thesis (page 47) */
 	  for(int j=0;j<pr#prfegeneo#prmesh#numberIntersection;++j) {
 	    Eij[j].resize(prT#si,pr#sizelg[pr#prfegeneo#prmesh#arrayIntersection[j]]);
@@ -178,6 +211,14 @@ else {
         }
       }
     }
+  }
+
+  for (int jj=0; jj < pr#sg; jj++) {
+    for (int ii=0; ii < prT#sg; ii++)
+      Egg(ii,jj) = pr#prfe#scalprod(prT#Z[ii+prT#si], AZmg(:,jj));
+
+      for (int ii=0; ii < prT#si; ii++)
+        Eig(ii,jj) = prT#Z[ii]'*AZmg(:,jj);
   }
 
   IFMACRO(pr#geneofullpattern)
@@ -372,6 +413,7 @@ else {
   
   pr#prfe#K[int,int][int] tabEij(nbij); /* big vector of full matrices for the blocks Eij */
   pr#prfe#K[int,int][int] tabEii(locnpart); /* big vector of full matrices for the blocks Eii */
+  pr#prfe#K[int,int][int] tabEig(locnpart); /* big vector of full matrices for the blocks Eig */
   
   /* commCS procs resize tabEii and receive Eii blocks */
   if (mpiRank(pr#prfe#prmesh#mpicomm) < pr#prfe#prmesh#pCS) {
@@ -419,7 +461,23 @@ else {
       int k = mpiWaitAny(rqt);
   }
 
-  if (mpiRank(pr#prfe#prmesh#mpicomm) < pr#prfe#prmesh#pCS) { /* fill E0 with Eii and Eij */
+  /* commCS procs resize tabEig and receive Eig blocks */
+  if (mpiRank(pr#prfe#prmesh#mpicomm) < pr#prfe#prmesh#pCS) {
+    for (int i = !pr#prfe#prmesh#excluded; i < locnpart; i++)
+      tabEig[i].resize(prT#sizelg[rkrdd(i)],pr#sg);
+    mpiRequest[int] rqt(locnpart-(!pr#prfe#prmesh#excluded));
+    for (int i = !pr#prfe#prmesh#excluded; i < locnpart; i++)
+      Irecv(processor(rkr(i),pr#prfe#prmesh#mpicomm,rqt[i-!pr#prfe#prmesh#excluded]),tabEig[i]);
+    for (int i = !pr#prfe#prmesh#excluded; i < locnpart; i++)
+      int k = mpiWaitAny(rqt);
+  }
+  else if (!pr#prfe#prmesh#excluded) {
+    mpiRequest rqt;
+    Isend(processor(rks(mpiRank(pr#prfe#prmesh#mpicomm)),pr#prfe#prmesh#mpicomm,rqt),Eig);
+    mpiWait(rqt);
+  }
+
+  if (mpiRank(pr#prfe#prmesh#mpicomm) < pr#prfe#prmesh#pCS) { /* fill E with Eii and Eij */
     int[int] offsetl(locnpart);
     for (int i = 0; i < locnpart; i++)
       offsetl[i] = (i == 0 ? 0 : offsetl[i-1] + pr#sizelg[rkrdd(i-1)]);
@@ -428,41 +486,76 @@ else {
     for (int i = 0; i < locnpart; i++)
       offsetl[i] = (i == 0 ? 0 : offsetl[i-1] + pr#sizelg[rkrdd(i-1)]);
 
-    pr#E0.resize(offsetl[locnpart-1] + pr#sizelg[rkrdd(locnpart-1)], pr#ncoarsespace);
-    pr#E0 = 0;
+    pr#E.resize(offsetl[locnpart-1] + pr#sizelg[rkrdd(locnpart-1)] + (mpiRank(pr#prfe#prmesh#mpicomm)==0)*prT#sg, pr#ncoarsespace);
+    /* TODO prT#sg > 0 works only when pCS = 1 */
+    assert(!prT#sg || pr#prfe#prmesh#pCS == 1);
 
     if (!pr#prfe#prmesh#excluded) {
       int k = mpiRank(pr#prfe#prmesh#mpicomm);
       /* block Epp */
-      for (int jj=0; jj< pr#sizelg[mpiRank(pr#prfe#prmesh#mpicomm)]; jj++)
-        pr#E0(0:prT#sizelg[k]-1,pr#offseti[k]+jj) = Eii(:,jj);
+      int[int] renumi = (0:prT#sizelg[k]-1);
+      int[int] renumj = (pr#offseti[k]:pr#offseti[k]+prT#sizelg[k]-1);
+      pr#E += Eii(renumi^-1,renumj^-1);
 
       /* blocks Epj */
-      for(int j=0;j<pr#prfegeneo#prmesh#numberIntersection;++j)
-      for (int jj=0; jj< pr#sizelg[pr#prfegeneo#prmesh#arrayIntersection[j]]; jj++)
-        pr#E0(0:prT#sizelg[k]-1,pr#offseti[pr#prfegeneo#prmesh#arrayIntersection[j]]+jj) = Eij[j](:,jj);
+      for(int j=0;j<pr#prfegeneo#prmesh#numberIntersection;++j) {
+        int rj = pr#prfegeneo#prmesh#arrayIntersection[j];
+        int[int] renumi = (0:prT#sizelg[k]-1);
+        int[int] renumj = (pr#offseti[rj]:pr#offseti[rj]+prT#sizelg[rj]-1);
+        pr#E += Eij[j](renumi^-1,renumj^-1);
+      }
+
+      /* blocks Epg */
+      if (pr#sg > 0) {
+        renumi = (0:prT#sizelg[k]-1);
+        renumj = (pr#ncoarsespace-pr#sg:pr#ncoarsespace-1);
+        pr#E += Eig(renumi^-1,renumj^-1);
+        pr#prfe#K[int,int] Eigt = Eig';
+        pr#E += Eigt(renumj^-1,renumi^-1); /* TODO works only in the symmetric case */
+      }
 
       IFMACRO(pr#geneofullpattern)
-      for(int j=0;j<fullnumberIntersection-pr#prfegeneo#prmesh#numberIntersection;++j)
-      for (int jj=0; jj< pr#sizelg[fullarrayIntersection[pr#prfegeneo#prmesh#numberIntersection+j]]; jj++)
-        pr#E0(0:prT#sizelg[k]-1,pr#offseti[fullarrayIntersection[pr#prfegeneo#prmesh#numberIntersection+j]]+jj) += Ekj[tabarrayIntersectionflat[j]](:,jj);
+      for(int j=0;j<fullnumberIntersection-pr#prfegeneo#prmesh#numberIntersection;++j) {
+        int rj = fullarrayIntersection[pr#prfegeneo#prmesh#numberIntersection+j];
+        int[int] renumi = (0:prT#sizelg[k]-1);
+        int[int] renumj = (pr#offseti[rj]:pr#offseti[rj]+prT#sizelg[rj]-1);
+        pr#E += Ekj[tabarrayIntersectionflat[j]](renumi^-1,renumj^-1);
+      }
       ENDIFMACRO
     }
     
     int cpt = 0;
     for (int i = !pr#prfe#prmesh#excluded; i < locnpart; i++) {
     	/* blocks Eii */
-      for (int jj=0; jj< pr#sizelg[rkrdd(i)]; jj++)
-        pr#E0(offsetl[i]:offsetl[i]+prT#sizelg[rkrdd(i)]-1,pr#offseti[rkrdd(i)]+jj) = tabEii[i](:,jj);
+      int[int] renumi = (offsetl[i]:offsetl[i]+prT#sizelg[rkrdd(i)]-1);
+      int[int] renumj = (pr#offseti[rkrdd(i)]:pr#offseti[rkrdd(i)]+prT#sizelg[rkrdd(i)]-1);
+      pr#E += tabEii[i](renumi^-1,renumj^-1);
+
       /* blocks Eij */
       for(int j=0;j<tabnumberIntersection[i];++j) {
-        for (int jj=0; jj< pr#sizelg[tabarrayIntersection[i][j]]; jj++)
-          pr#E0(offsetl[i]:offsetl[i]+prT#sizelg[rkrdd(i)]-1,pr#offseti[tabarrayIntersection[i][j]]+jj) += tabEij[cpt](:,jj);
+        int rj = tabarrayIntersection[i][j];
+        int[int] renumi = (offsetl[i]:offsetl[i]+prT#sizelg[rkrdd(i)]-1);
+        int[int] renumj = (pr#offseti[rj]:pr#offseti[rj]+prT#sizelg[rj]-1);
+        pr#E += tabEij[cpt](renumi^-1,renumj^-1);
         cpt++;
-      }	
+      }
+
+      /* blocks Eig */
+      if (pr#sg > 0) {
+        renumi = (offsetl[i]:offsetl[i]+prT#sizelg[rkrdd(i)]-1);
+        renumj = (pr#ncoarsespace-pr#sg:pr#ncoarsespace-1);
+        pr#E += tabEig[i](renumi^-1,renumj^-1);
+        pr#prfe#K[int,int] Eigt = tabEig[i]';
+        pr#E += Eigt(renumj^-1,renumi^-1); /* TODO works only in the symmetric case */
+      }
     }
 
-    pr#E = pr#E0;
+    /* block Egg */
+    if (mpiRank(pr#prfe#prmesh#mpicomm) == 0 && pr#sg > 0) {
+      int[int] renumi = (pr#ncoarsespace-pr#sg:pr#ncoarsespace-1);
+      pr#E += Egg(renumi^-1,renumi^-1);
+    }
+
     IFMACRO(pr#CSwithpetsc)
     Mat pr#petsctmp(pr#E.n,communicator = pr#prfe#prmesh#commCS);
     pr#petsctmp = pr#E;
@@ -472,17 +565,24 @@ else {
     ENDIFMACRO
     pr#E0.resize(1,1);
     IFMACRO(!pr#CSwithpetsc)
-    int[int] Rl(offsetl[locnpart-1] + pr#sizelg[rkrdd(locnpart-1)]);
+    int[int] Rl(offsetl[locnpart-1] + pr#sizelg[rkrdd(locnpart-1)] + (mpiRank(pr#prfe#prmesh#mpicomm) == 0)*pr#sg);
     for (int i = 0; i < locnpart; i++)
     for (int jj=0; jj< pr#sizelg[rkrdd(i)]; jj++)
       Rl[offsetl[i]+jj] = pr#offseti[rkrdd(i)]+jj;
-    int[int] Rlc = (0:Rl.n-1);
-    pr#prfe#K[int] Rlk(Rl.n);
-    Rlk = 1;
-    matrix<pr#prfe#K> mRl = [Rlc,Rl,Rlk];
-    mRl.resize(Rl.n, pr#ncoarsespace);
+    if (mpiRank(pr#prfe#prmesh#mpicomm) == 0)
+    for (int i = 0; i < pr#sg; i++)
+      Rl[offsetl[locnpart-1] + pr#sizelg[rkrdd(locnpart-1)] + i] = pr#ncoarsespace-pr#sg+i;
     pr#E.resize(Rl.n, pr#ncoarsespace);
-    pr#E = mRl'*pr#E;
+    if (Rl.n > 0) {
+      int[int] Rlc = (0:Rl.n-1);
+      pr#prfe#K[int] Rlk(Rl.n);
+      Rlk = 1;
+      matrix<pr#prfe#K> mRl = [Rlc,Rl,Rlk];
+      mRl.resize(Rl.n, pr#ncoarsespace);
+      pr#E = mRl'*pr#E;
+    }
+    else
+      pr#E.resize(pr#ncoarsespace, pr#ncoarsespace);
     ENDIFMACRO
   }
 
@@ -716,14 +816,12 @@ pr#prfe#prmesh#toc(pr#tloc,"building E",pr#tbuildE)
 
 // EOM
 
-macro ffddmgeneosetup(pr,Varf)
+macro ffddmbuildgeneoZ(pr,Varf)
 
 pr#bCM = 0;
 
 if (pr#prfe#prmesh#isincomm)
 {
-pr#corr = ffddmcorrection;
-
 int nev = ffddmnu;
 
 IFMACRO(pr#withhpddm)
@@ -755,7 +853,6 @@ pr#si=0;
 pr#prfe#prmesh#tic(pr#tloc)
 
 int[int] sizel(pr#prfe#prmesh#npart);
-int[int] sizelT(pr#prfe#prmesh#npart);
 
 for(int i=0;i<pr#prfe#prmesh#npart;++i)
 if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#commddm)))) {
@@ -827,20 +924,37 @@ if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#comm
 
   sizel[i] = nok;	/* number of ev for subdomain i */
 }
+pr#Z.resize(pr#si);
+
+/* pr#sizelg stores the number of ev for every subdomain */
+if (!bpara)
+  pr#sizelg = sizel;
+else {
+  pr#sizelg = 0;
+  mpiAllReduce(sizel,pr#sizelg,pr#prfe#prmesh#mpicomm,mpiSUM);
+}
+
 if (bseq)
   pr#prfe#prmesh#Thi = pr#prfe#prmesh#Thglob;
 
 pr#prfe#prmesh#toc(pr#tloc,"local eigenvalue problems",pr#teigenv)
 
-ffddmbuildZTAZ(pr,pr,Varf)
-
 ENDIFMACRO
 }
 // EOM
 
-macro ffddmdtnsetup(pr,Varf,lambdamax)
+macro ffddmgeneosetup(pr,Varf)
+ffddmbuildgeneoZ(pr,Varf)
+ffddmbuildZTAZ(pr,pr,Varf)
+if (pr#prfe#prmesh#isincomm)
+  pr#corr = ffddmcorrection;
+// EOM
+
+macro ffddmdtnsetup(pr,Varf,Varfmass,VarfDirichlet,lambdamax)
 
 pr#bCM = 0;
+
+pr#regularizeE = 1e-12;
 
 if (pr#prfe#prmesh#isincomm)
 {
@@ -881,19 +995,24 @@ pr#si=0;
 pr#prfe#prmesh#tic(pr#tloc) /* For timings */
 
 int[int] sizel(pr#prfe#prmesh#npart);
-int[int] sizelT(pr#prfe#prmesh#npart);
 
 for(int i=0;i<pr#prfe#prmesh#npart;++i) /* Loop over the subdomains */
 if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#commddm)))) { /* If subdomain assigned to this processor */
 	pr#prfe#prmesh#Thi=pr#prfe#prmesh#aTh[i]; /* Local mesh */
 
   /* Start DtN part */
-
   varf vv(pr#prfe#mdef(u), pr#prfe#mdef(v)) = on(ffddminterfacelabel, pr#prfe#mdef(u) = pr#prfe#minit(1)); /* Mark interface */
   real[int] b10 = vv(0,pr#prfe#Vhi,tgv=1);
+
+  IFMACRO(VarfDirichlet)
+  VarfDirichlet(vDir,pr#prfe#prmesh#Thi,pr#prfe#Vhi) /* Mark Dirichlet dofs */
+  real[int] bDir = vDir(0,pr#prfe#Vhi,tgv=1);
+  b10 = bDir ? 0 : b10; /* Remove Dirichlet dofs from interface */
+  ENDIFMACRO
+
   int ndof10 = 0, ndofint = 0; /* Set up interface and interior DOFs */
   for (int j=0;j<b10.n;j++) {
-    if (b10[j] != 0) {
+    if (b10[j]) {
       ndof10++;
       b10[j] = ndof10; /* Enumerate interface DOFs */
     }
@@ -932,7 +1051,7 @@ if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#comm
   {
     if (pr#prfe#prmesh#overlap > 0) {
       Varf(vN,pr#prfe#prmesh#Thi,pr#prfe#Vhi)
-      pr#matN = vN(pr#prfe#Vhi,pr#prfe#Vhi,sym=vsym,tgv=vtgv,solver=GMRES);
+      pr#matN = vN(pr#prfe#Vhi,pr#prfe#Vhi,sym=vsym,tgv=1e+30,solver=GMRES);
     }
   }
   ENDIFMACRO
@@ -953,8 +1072,8 @@ if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#comm
   matrix<pr#prfe#K> A10int = A10intt*Rint';
 
   /* Interface mass matrix */
-  varf vmass(pr#prfe#mdef(u),pr#prfe#mdef(v)) = pr#prfe#prmesh#intbN(pr#prfe#prmesh#Thi,ffddminterfacelabel)(pr#prfe#mdef(u)'*pr#prfe#mdef(v));
-  matrix<pr#prfe#K> mmass = vmass(pr#prfe#Vhi,pr#prfe#Vhi);
+  Varfmass(vmass,pr#prfe#prmesh#Thi,pr#prfe#Vhi)
+  matrix<pr#prfe#K> mmass = vmass(pr#prfe#Vhi,pr#prfe#Vhi,solver=GMRES);
   matrix<pr#prfe#K> mmass10t = R10*mmass;
   matrix<pr#prfe#K> mmass10 = mmass10t*R10';
   set(mmass10,solver=sparsesolver,commworld=pr#prfe#prmesh#commself);
@@ -1005,7 +1124,7 @@ if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#comm
   {
     if(j<kk && (real(ev[j]) < lambdamax)) /* Criterion 4.3 of Lea's paper */
     {
-    /* cout << "Eigenvalue " << i << "," << nok << " " << ev[j] << endl; */
+    if (mpiRank(pr#prfe#prmesh#commddm) == 0) cout << "Eigenvalue " << i << "," << nok << " " << ev[j] << endl;
     /* Retain eigenfuntion on interface */
     tmp = R10'*eVC(:,j);
      /* Extend eigenfunctions into the domain */
@@ -1025,6 +1144,16 @@ if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#comm
 
   sizel[i] = nok;	/* number of ev for subdomain i */
 }
+pr#Z.resize(pr#si);
+
+/* pr#sizelg stores the number of ev for every subdomain */
+if (!bpara)
+  pr#sizelg = sizel;
+else {
+  pr#sizelg = 0;
+  mpiAllReduce(sizel,pr#sizelg,pr#prfe#prmesh#mpicomm,mpiSUM);
+}
+
 if (bseq)
   pr#prfe#prmesh#Thi = pr#prfe#prmesh#Thglob;
 
@@ -1034,4 +1163,442 @@ ffddmbuildZTAZ(pr,pr,Varf)
 
 ENDIFMACRO
 }
+// EOM
+
+macro ffddmharmonicgeneosetup(pr,Varf,VarfLap,VarfIP,lambdamax)
+
+pr#bCM = 0;
+
+pr#regularizeE = 1e-12;
+
+if (pr#prfe#prmesh#isincomm)
+{
+int nev = ffddmnu;
+
+IFMACRO(!pr#withhpddm)
+
+if (!bpara)
+  pr#Z.resize(nev*pr#prfe#prmesh#npart);
+else if (!pr#prfe#prmesh#excluded)
+  pr#Z.resize(nev);
+
+pr#si=0;
+pr#prfe#prmesh#tic(pr#tloc)
+
+int[int] sizel(pr#prfe#prmesh#npart);
+
+for(int i=0;i<pr#prfe#prmesh#npart;++i)
+if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#commddm)))) {
+	pr#prfe#prmesh#Thi=pr#prfe#prmesh#aTh[i];
+
+  int nbdofint = 0;
+  matrix<pr#prfe#K> bA, bB;
+
+  {
+    VarfIP(vIP,pr#prfe#prmesh#Thi,pr#prfe#Vhi)
+    matrix<pr#prfe#K> pr#matIP = vIP(pr#prfe#Vhi,pr#prfe#Vhi,sym=0,tgv=-10,solver=GMRES);
+
+    VarfLap(vL,pr#prfe#prmesh#Thi,pr#prfe#Vhi)
+    matrix<pr#prfe#K> pr#matLap = vL(pr#prfe#Vhi,pr#prfe#Vhi,sym=0,tgv=-1,solver=GMRES);
+
+    Varf(vH,pr#prfe#prmesh#Thi,pr#prfe#Vhi)
+    matrix<pr#prfe#K> pr#matH = vH(pr#prfe#Vhi,pr#prfe#Vhi,sym=0,tgv=-1,solver=GMRES);
+
+    matrix<pr#prfe#K> weightedTmp = pr#matIP*pr#prfe#Dih[i];
+    matrix<pr#prfe#K> weighted = pr#prfe#Dih[i]*weightedTmp;
+
+    varf vext(u,v) = on(ffddminterfacelabel,u=1);
+
+    pr#prfe#K[int] bext = vext(0,pr#prfe#Vhi,tgv=1);
+
+    int[int] II(bext.n), JJ(bext.n);
+    pr#prfe#K[int] KK(bext.n);
+
+    for (int jj=0; jj<bext.n; jj++)
+      if (!abs(bext[jj])) {
+      II[nbdofint] = nbdofint; JJ[nbdofint] = jj;
+      KK[nbdofint] = 1;
+      nbdofint++;
+    }
+
+    matrix<pr#prfe#K> Rint = [II,JJ,KK];
+    Rint.resize(nbdofint,bext.n);
+
+    matrix<pr#prfe#K> mzeros(nbdofint,nbdofint);
+
+    matrix<pr#prfe#K> mBB = Rint*pr#matH;
+
+    bA = [[pr#matLap,mBB'],[mBB,mzeros]];
+
+    bB = [[weighted,0],[0,mzeros]];
+    bB.resize(weighted.n+nbdofint,weighted.n+nbdofint);
+  }
+
+  /* set(bA,solver = sparsesolver,sym=1,commworld=pr#prfe#prmesh#commself); */
+
+  pr#prfe#K[int] ev(nev);
+  pr#prfe#K[int,int] eVV(pr#prfe#Dk[i].n + nbdofint,nev);
+
+  NewMacro localmacroK pr#prfe#K EndMacro
+  IFMACRO(localmacroK,real)
+  load "PETSc"
+  ENDIFMACRO
+  IFMACRO(localmacroK,complex)
+  load "PETSc-complex"
+  ENDIFMACRO
+
+  Mat<pr#prfe#K> SA(bA,communicator=mpiCommSelf);
+
+  Mat<pr#prfe#K> SB(bB,communicator=mpiCommSelf);
+
+  int k = EPSSolve(SA,SB, sparams =
+    "-prefix_push harmonicgeneo_ "+
+    "-eps_nev "+nev+" "+
+    "-eps_type krylovschur "+
+    "-eps_target_largest_magnitude "+
+    "-eps_gen_non_hermitian "+
+    /*"-eps_pos_gen_non_hermitian "+*/
+    "-eps_target 0. "+
+    "-eps_tol 1e-12 "+
+    "-eps_conv_abs "+
+    "-st_type sinvert "+
+    "-st_pc_type lu "+
+    "-st_pc_factor_mat_solver_type mumps "+
+    "-st_mat_mumps_icntl_14 330 "+
+    "-bv_orthog_type mgs " +
+    "-bv_orthog_refine always " +
+    (mpiRank(pr#prfe#prmesh#commddm) == 0 ?"-eps_error_absolute ::ascii_info_detail ":" ")+
+    "-prefix_pop",
+    values = ev, array = eVV, prefix="harmonicgeneo_");
+
+  /* int kk = EigenValue(bA,bB,value=ev,rawvector=eVV,ncv=max(20,3*nev),tol=1e-12); */
+
+  int nok = 0;
+
+  for(int j=0;j<nev;++j) {
+    if (j == 0 || ffddmtau == 0 || (real(ev[j]) > 0 && real(ev[j]) < lambdamax)) {
+       /* if (mpirank == 0) cout << i << " " << pr#si << " " << ev[j] << endl; */
+      if (pr#verbosity >= 1 && abs(imag(ev[j])) > 1e-6) cout << "["+Stringification(pr)+"] Warning in ffddmharmonicgeneosetup: nonzero imaginary part " << imag(ev[j]) << " of eigenvalue " << j << endl;
+      pr#Z[pr#si].resize(pr#prfe#Dk[i].n);
+      pr#Z[pr#si] = pr#prfe#Dk[i].*eVV(0:pr#prfe#Dk[i].n-1,j);
+      if (pr#Z[pr#si].sum < 0) pr#Z[pr#si] *= -1;
+      pr#si+=1;
+      nok+=1;
+    }
+  }
+  sizel[i] = nok;	/* number of ev for subdomain i */
+}
+pr#Z.resize(pr#si);
+
+/* pr#sizelg stores the number of ev for every subdomain */
+if (!bpara)
+  pr#sizelg = sizel;
+else {
+  pr#sizelg = 0;
+  mpiAllReduce(sizel,pr#sizelg,pr#prfe#prmesh#mpicomm,mpiSUM);
+}
+
+if (bseq)
+  pr#prfe#prmesh#Thi = pr#prfe#prmesh#Thglob;
+
+pr#prfe#prmesh#toc(pr#tloc,"local eigenvalue problems",pr#teigenv)
+
+ENDIFMACRO
+}
+
+ffddmbuildZTAZ(pr,pr,Varf)
+if (pr#prfe#prmesh#isincomm)
+  pr#corr = ffddmcorrection;
+
+// EOM
+
+macro ffddmextendedharmonicgeneosetup(pr,Varf,VarfC)
+
+pr#bCM = 0;
+
+pr#regularizeE = 1e-12;
+
+if (pr#prfe#prmesh#isincomm)
+{
+int nev = ffddmnu;
+
+IFMACRO(!pr#withhpddm)
+
+if (!bpara)
+  pr#Z.resize(nev*pr#prfe#prmesh#npart);
+else if (!pr#prfe#prmesh#excluded)
+  pr#Z.resize(nev);
+
+pr#si=0;
+pr#prfe#prmesh#tic(pr#tloc)
+
+int[int] sizel(pr#prfe#prmesh#npart);
+
+for(int i=0;i<pr#prfe#prmesh#npart;++i)
+if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#commddm)))) {
+	pr#prfe#prmesh#Thi=pr#prfe#prmesh#aTh[i];
+	pr#prfe#prmesh#AugThi=pr#prfe#prmesh#AugaTh[i];
+
+  matrix pr#prfe#AugAuginterp;
+  matrix<pr#prfe#K> ADirichlettilde, CDirichlettilde;
+
+  {
+    pr#prfe#prmesh#meshN pr#prfe#prmesh#AugAugThi = pr#prfe#prmesh#AugThi + pr#prfe#prmesh#AugaThborder[i];
+    fespace pr#prfe#AugAugVhi(pr#prfe#prmesh#AugAugThi, pr#prfe#fPk);
+    int[int] n2o = (0:pr#prfe#prmesh#AugThi.nt-1);
+    int[int] renum = restrict(pr#prfe#AugVhi, pr#prfe#AugAugVhi,n2o);
+    int[int] Ic = (0:pr#prfe#AugVhi.ndof-1);
+    real[int] Kc(pr#prfe#AugVhi.ndof);
+    Kc = 1;
+    pr#prfe#AugAuginterp = [Ic,renum,Kc];
+    pr#prfe#AugAuginterp.resize(pr#prfe#AugVhi.ndof, pr#prfe#AugAugVhi.ndof);
+
+    Varf(vPb, pr#prfe#prmesh#AugAugThi, pr#prfe#AugAugVhi)
+    ADirichlettilde = vPb(pr#prfe#AugAugVhi, pr#prfe#AugAugVhi,sym=vsym,tgv=-10,solver=GMRES);
+    renumbering(ADirichlettilde, pr#prfe#AugAuginterp, eps=-1);
+
+    VarfC(vPbC, pr#prfe#prmesh#AugAugThi, pr#prfe#AugAugVhi)
+    CDirichlettilde = vPbC(pr#prfe#AugAugVhi, pr#prfe#AugAugVhi,sym=vsym,tgv=-10,solver=GMRES);
+    renumbering(CDirichlettilde, pr#prfe#AugAuginterp, eps=-1);
+  }
+
+  pr#prfe#K[int] Dktilde = pr#prfe#Auginterp' * pr#prfe#Dk[i];
+
+  pr#prfe#K[int] vi(pr#prfe#Dk[i].n), wi(pr#prfe#Dk[i].n), via(Dktilde.n), wia(Dktilde.n), zia(Dktilde.n);
+
+  func pr#prfe#K[int] localsolver(pr#prfe#K[int] &ui) {
+      vi = ui;
+      if (pr#prec == "soras") { vi = pr#prfe#Dk[i].*ui; }
+      wi = pr#aR[i]^-1 * vi;
+      vi = wi;
+      if (pr#prec != "asm") { vi = pr#prfe#Dk[i].*wi; }
+      return vi;
+  }
+
+  func pr#prfe#K[int] localsolveradjoint(pr#prfe#K[int] &ui) {
+      vi = ui;
+      if (pr#prec != "asm") { vi = pr#prfe#Dk[i].*ui; }
+      wi = pr#aR[i]'^-1 * vi;
+      vi = wi;
+      if (pr#prec == "soras") { vi = pr#prfe#Dk[i].*wi; }
+      return vi;
+  }
+
+  func pr#prfe#K[int] Cweightedfunc(pr#prfe#K[int] &uia)
+  {
+    via = ADirichlettilde*uia;
+    vi = pr#prfe#Auginterp*via;
+    wi = localsolver(vi);
+    via = pr#prfe#Auginterp'*wi;
+    wia = Dktilde.*uia;
+    wia -= via;
+    zia = CDirichlettilde*wia;
+    vi = pr#prfe#Auginterp*zia;
+    wi = localsolveradjoint(vi);
+    via = pr#prfe#Auginterp'*wi;
+    wia = ADirichlettilde'*via;
+    via = Dktilde.*zia;
+    via -= wia;
+    return via;
+  };
+
+  NewMacro localmacroK pr#prfe#K EndMacro
+  IFMACRO(localmacroK,real)
+  load "PETSc"
+  ENDIFMACRO
+  IFMACRO(localmacroK,complex)
+  load "PETSc-complex"
+  ENDIFMACRO
+
+  Mat<pr#prfe#K> Cweightedopshell(pr#prfe#AugDk[i].n, communicator = mpiCommSelf);
+  Mat<pr#prfe#K> Cweightedop(Cweightedopshell, Cweightedfunc);
+
+  {
+    VarfC(vN,pr#prfe#prmesh#AugThi,pr#prfe#AugVhi)
+    pr#matN = vN(pr#prfe#AugVhi,pr#prfe#AugVhi,sym=vsym,tgv=-1,solver=GMRES);
+  }
+
+  Mat<pr#prfe#K> PetscCNeumanntilde(pr#matN, communicator = mpiCommSelf);
+
+  pr#prfe#K[int,int] eV(pr#prfe#AugDk[i].n,nev);
+  pr#prfe#K[int] ev(nev);
+
+  int k = EPSSolve(PetscCNeumanntilde, Cweightedop, sparams =
+    "-prefix_push extendedharmonicgeneo_ "+
+    "-eps_nev "+nev+" "+
+    "-eps_type krylovschur "+
+    "-eps_target_largest_magnitude "+
+    "-eps_gen_non_hermitian "+
+    /*"-bv_definite_tol 1e-5 "+*/
+    "-eps_target 0. "+
+    "-eps_tol 1e-12 "+
+    "-eps_conv_abs "+
+    "-st_type sinvert "+
+    "-st_pc_type lu "+
+    "-st_pc_factor_mat_solver_type mumps "+
+    "-bv_orthog_type mgs " +
+    "-bv_orthog_refine always " +
+    (mpiRank(pr#prfe#prmesh#commddm) == 0 ?"-eps_error_absolute ::ascii_info_detail ":" ")+
+    "-prefix_pop",
+    values = ev, array = eV, prefix="extendedharmonicgeneo_");
+
+  IFMACRO(!pr#superalgebraic)
+  pr#matN.clear;
+  ENDIFMACRO
+
+  int nok = 0;
+
+  for(int j=0;j<nev;++j) {
+    if (j == 0 || ffddmtau == 0 || (real(ev[j]) > 0 && real(ev[j]) < ffddmtau)) {
+      /*if (mpirank == 0) cout << i << " " << pr#si << " " << ev[j] << endl;*/
+      assert(pr#prec != "asm"); /* otherwise eigenvector in tilde Omega */
+      if (pr#verbosity >= 1 && abs(imag(ev[j])) > 1e-6) cout << "["+Stringification(pr)+"] Warning in ffddmextendedharmonicgeneosetup: nonzero imaginary part " << imag(ev[j]) << " of eigenvalue " << j << endl;
+      pr#Z[pr#si].resize(pr#prfe#Dk[i].n);
+      via = ADirichlettilde*eV(:,j);
+      vi = pr#prfe#Auginterp*via;
+      wi = localsolver(vi);
+      via = pr#prfe#Auginterp'*wi;
+      wia = Dktilde.*eV(:,j);
+      wia -= via;
+      pr#Z[pr#si] = pr#prfe#Auginterp*wia;
+      if (pr#Z[pr#si].sum < 0) pr#Z[pr#si] *= -1;
+      pr#si+=1;
+      nok+=1;
+    }
+  }
+
+  sizel[i] = nok;	/* number of ev for subdomain i */
+}
+pr#Z.resize(pr#si);
+
+/* pr#sizelg stores the number of ev for every subdomain */
+if (!bpara)
+  pr#sizelg = sizel;
+else {
+  pr#sizelg = 0;
+  mpiAllReduce(sizel,pr#sizelg,pr#prfe#prmesh#mpicomm,mpiSUM);
+}
+
+if (bseq)
+  pr#prfe#prmesh#Thi = pr#prfe#prmesh#Thglob;
+
+pr#prfe#prmesh#toc(pr#tloc,"local eigenvalue problems",pr#teigenv)
+
+ENDIFMACRO
+}
+
+ffddmbuildZTAZ(pr,pr,Varf)
+if (pr#prfe#prmesh#isincomm)
+  pr#corr = ffddmcorrection;
+
+// EOM
+
+macro ffddmgeneohelmholtzsetup(pr,Varf,VarfA)
+
+pr#bCM = 0;
+
+if (pr#prfe#prmesh#isincomm)
+{
+
+int nev = ffddmnu;
+
+IFMACRO(!pr#withhpddm)
+
+if (!bpara)
+  pr#Z.resize(nev*pr#prfe#prmesh#npart);
+else if (!pr#prfe#prmesh#excluded)
+  pr#Z.resize(nev);
+
+pr#si=0;
+pr#prfe#prmesh#tic(pr#tloc)
+
+int[int] sizel(pr#prfe#prmesh#npart);
+
+for(int i=0;i<pr#prfe#prmesh#npart;++i)
+if ((!pr#prfe#prmesh#excluded) && ((!bpara) || (i == mpiRank(pr#prfe#prmesh#commddm)))) {
+  pr#prfe#prmesh#Thi=pr#prfe#prmesh#aTh[i];
+
+  VarfA(vA,pr#prfe#prmesh#Thi,pr#prfe#Vhi)
+  matrix<pr#prfe#K> pr#aRprec = vA(pr#prfe#Vhi,pr#prfe#Vhi,sym=0,tgv=-10,solver=GMRES);
+
+  pr#prfe#K[int,int] eV(pr#prfe#Dk[i].n,nev);
+  pr#prfe#K[int] ev(nev);
+
+  matrix<pr#prfe#K> weightedTmp;
+  weightedTmp=pr#aRprec*pr#prfe#Dih[i];
+  matrix<pr#prfe#K> weighted;
+  weighted=pr#prfe#Dih[i]*weightedTmp; /* = D_i A_i D_i */
+
+  IFMACRO(!pr#algebraic)
+  {
+    Varf(vN,pr#prfe#prmesh#Thi,pr#prfe#Vhi)
+    pr#matN = vN(pr#prfe#Vhi,pr#prfe#Vhi,sym=0,tgv=-1,solver=GMRES);
+  }
+  ENDIFMACRO
+
+  NewMacro localmacroK pr#prfe#K EndMacro
+  IFMACRO(localmacroK,real)
+  load "PETSc"
+  ENDIFMACRO
+  IFMACRO(localmacroK,complex)
+  load "PETSc-complex"
+  ENDIFMACRO
+
+  Mat<pr#prfe#K> SA(pr#matN,communicator=pr#prfe#prmesh#commself);
+
+  Mat<pr#prfe#K> SB(weighted,communicator=pr#prfe#prmesh#commself);
+
+  int kk = EPSSolve(SA, SB, sparams =
+    "-prefix_push Hk_GenEO_ "+
+    "-eps_nev "+nev+" "+
+    "-eps_type krylovschur "+
+    "-eps_target_real "+
+    "-eps_gen_non_hermitian "+
+    "-eps_target -10 "+
+    "-eps_tol 1e-12 "+
+    "-eps_conv_abs "+
+    "-st_type sinvert "+
+    "-st_pc_type lu "+
+    "-st_pc_factor_mat_solver_type mumps "+
+    "-bv_orthog_type mgs "+
+    "-bv_orthog_refine always "+
+    (mpiRank(pr#prfe#prmesh#commddm) == 0 ?"-eps_error_absolute ::ascii_info_detail ":" ")+
+    "-prefix_pop",
+   values  = ev, array = eV, prefix = "Hk_GenEO_");
+
+  int nok = 0;
+
+  for(int j=0;j<nev;++j) {
+    if (j == 0 || ffddmtau == 0 || (real(ev[j]) < ffddmtau)) {
+      pr#Z[pr#si].resize(pr#prfe#Dk[i].n);
+      pr#Z[pr#si] = pr#prfe#Dk[i].*eV(:,j);
+      if (pr#Z[pr#si].sum < 0) pr#Z[pr#si] *= -1;
+      pr#si+=1;
+      nok+=1;
+    }
+  }
+  sizel[i] = nok;
+}
+pr#Z.resize(pr#si);
+
+/* pr#sizelg stores the number of ev for every subdomain */
+if (!bpara)
+  pr#sizelg = sizel;
+else {
+  pr#sizelg = 0;
+  mpiAllReduce(sizel,pr#sizelg,pr#prfe#prmesh#mpicomm,mpiSUM);
+}
+
+if (bseq)
+  pr#prfe#prmesh#Thi = pr#prfe#prmesh#Thglob;
+
+pr#prfe#prmesh#toc(pr#tloc,"local eigenvalue problems",pr#teigenv)
+
+ENDIFMACRO
+}
+
+ffddmbuildZTAZ(pr,pr,Varf)
+if (pr#prfe#prmesh#isincomm)
+  pr#corr = ffddmcorrection;
+
 // EOM

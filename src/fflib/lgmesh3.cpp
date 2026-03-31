@@ -704,22 +704,26 @@ long pmesh_nv(pmeshS * p) { ffassert(p) ;  return *p ? (**p).nv : 0;}
 long pmesh_nbe(pmeshS * p) { ffassert(p) ;  return *p ? (**p).nbe : 0;}
 
 double pmesh_hmax(pmeshS * p)
-{ ffassert(p && *p) ;
+{ if(p && *p) {
     double hmax2 =0;
     const MeshS & Th = **p;
     for(int k=0; k< Th.nt; ++k)
         for(int e=0; e<3; ++e)
             hmax2=max(hmax2,Th[k].Edge(e).norme2());
     return sqrt(hmax2);}
+  else return 0.0;
+}
 
 double pmesh_hmin(pmeshS * p)
-{ throwassert(p && *p) ;
+{ if(p && *p) {
     double hmin2 =1e100;
     const MeshS & Th = **p;
     for(int k=0; k< Th.nt; ++k)
         for(int e=0; e<3; ++e)
             hmin2=min(hmin2,Th[k].Edge(e).norme2());
     return sqrt(hmin2);}
+  else return 0.0;
+}
 
 template<class MMesh>
 class Op3_MeshDmp : public quad_function< const MMesh* *, R, R, R, MeshPoint * > {
@@ -784,21 +788,24 @@ long pmesh_nv(pmeshL * p) { ffassert(p) ;  return *p ? (**p).nv : 0;}
 long pmesh_nbe(pmeshL * p) { ffassert(p) ;  return *p ? (**p).nbe : 0;}
 
 double pmesh_hmax(pmeshL * p)
-{ ffassert(p && *p) ;
+{ if(p && *p) {
     double hmax2 =0;
     const MeshL & Th = **p;
     for(int k=0; k< Th.nt; ++k)
             hmax2=max(hmax2,Th[k].Edge(0).norme2());
     return sqrt(hmax2);}
+  else return 0.0;
+}
 
 double pmesh_hmin(pmeshL * p)
-{ throwassert(p && *p) ;
+{ if(p && *p) {
     double hmin2 =1e100;
     const MeshL & Th = **p;
     for(int k=0; k< Th.nt; ++k)
             hmin2=min(hmin2,Th[k].Edge(0).norme2());
     return sqrt(hmin2);}
-
+  else return 0.0;
+}
 
 
 
@@ -915,25 +922,42 @@ class ReadMesh3 :  public E_F0 { public:
     
   Expression filename; 
   typedef pmesh3  Result;
-  ReadMesh3(const basicAC_F0 & args) 
+    
+    static const int n_name_param = 3;
+    static basicAC_F0::name_and_type name_param [];
+    Expression nargs[n_name_param];
+
+  ReadMesh3(const basicAC_F0 & args)
   {   
-    args.SetNameParam(); 
-    filename=to<string*>(args[0]);   
+      args.SetNameParam(n_name_param, name_param, nargs);
+    filename=to<string*>(args[0]);
   }   
   static ArrayOfaType  typeargs() { return  ArrayOfaType(atype<string*>());}
-  static  E_F0 * f(const basicAC_F0 & args){ return new ReadMesh3(args);} 
+  static  E_F0 * f(const basicAC_F0 & args){ return new ReadMesh3(args);}
   AnyType operator()(Stack stack) const;
+};
+basicAC_F0::name_and_type ReadMesh3::name_param [] = {
+    {"cleanmesh", &typeid(bool)},
+    {"removeduplicate", &typeid(bool)},
+    {"rebuildboundary", &typeid(bool)}
 };
 
 
-AnyType ReadMesh3::operator()(Stack stack) const 
+AnyType ReadMesh3::operator()(Stack stack) const
 {
   using  Fem2D::MeshPointStack;
  
   string * fn =  GetAny<string*>((*filename)(stack));
+    bool clean = 0;
+    bool rmdup = 0;
+    bool rbbd = 0;
+    if(nargs[0]) clean =GetAny<bool>( (*(nargs[0]))(stack));
+    if(nargs[1]) rmdup =GetAny<bool>( (*(nargs[1]))(stack));
+    if(nargs[2]) rbbd =GetAny<bool>( (*(nargs[2]))(stack));
+
   if(verbosity > 2)
-      cout << "ReadMesh3 " << *fn << endl;
-  Mesh3 *Thh = new Mesh3(*fn);
+      cout << "ReadMesh3 " << *fn << "  clean " << clean << " rmdup " << rmdup << " rbbd " <<rbbd <<endl;
+  Mesh3 *Thh = new Mesh3(*fn,clean,rmdup,rbbd);
 
   Thh->BuildGTree();
     if (Thh->meshS) Thh->meshS->BuildGTree();
@@ -1676,6 +1700,12 @@ AnyType CheckMoveMesh::operator()(Stack stack) const
 }
 */
 
+#if defined(__clang__) && defined(__has_warning)
+#if __has_warning("-Wundefined-var-template")
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-var-template"
+#endif
+#endif
 template<class R, class v_fes>
 AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
 {
@@ -1695,6 +1725,7 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
   MeshPoint *mps=MeshPointStack(s),mp=*mps;  
   pair<FEbase<R,v_fes> *,int>  pp=GetAny<pair<FEbase<R,v_fes> *,int> >((*ppfe)(s));
   FEbase<R,v_fes> & fe(*pp.first);
+  const FESpace *pVho = fe.Vh;
   const  FESpace & Vh(*fe.newVh());
   KN<R> gg(Vh.MaximalNbOfDF()); 
   const  Mesh & Th(Vh.Th);
@@ -1706,6 +1737,9 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
     {  cerr << " Try to set a  vectorial  FE function  (nb  componant=" <<  Vh.N << ") with one scalar " << endl;
        ExecError(" Error interploation (set)  FE function (vectorial) with a scalar");
     }
+  KN< R > *xx = fe.x(); // get array
+    bool change = !xx || (xx->N() != Vh.NbOfDF)|| (pVho && pVho != &Vh);
+
   KN<R> * y=new  KN<R>(Vh.NbOfDF);
   KN<R> & yy(*y);
   // interpoler
@@ -1757,7 +1791,11 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
 	}
     }
   *mps=mp;
-  fe=y;
+  if(change) fe = y;// change the array pointeur
+  else {
+      *fe.x() = yy;//  copy value in new value in old vector
+      delete y;
+  }
   kkff = Mesh::kfind - kkff;
   kkth = Mesh::kthrough -kkth;
   
@@ -1766,7 +1804,11 @@ AnyType set_fe3 (Stack s,Expression ppfe, Expression e)
       << " " << kkth << "/" << kkff << " =  " << double(kkth)/Max<double>(1.,kkff) << endl;
   return SetAny<FEbase<R,v_fes>*>(&fe); 
 }
-
+#if defined(__clang__) && defined(__has_warning)
+#if __has_warning("-Wundefined-var-template")
+#pragma clang diagnostic pop
+#endif
+#endif
 
 
 
@@ -1845,7 +1887,8 @@ AnyType E_set_fev3<K,v_fes>::operator()(Stack s)  const
   MeshPoint *mps=MeshPointStack(s), mp=*mps;   
   FEbase<K,v_fes> ** pp=GetAny< FEbase<K,v_fes> **>((*ppfe)(s));
   FEbase<K,v_fes> & fe(**pp);
-  const  FESpace & Vh(*fe.newVh());
+  const FESpace *pVho = fe.Vh;
+  const FESpace & Vh(*fe.newVh());
  // KN<K> gg(Vh.MaximalNbOfDF()); 
   
   const  Mesh & Th(Vh.Th); 
@@ -1872,7 +1915,9 @@ AnyType E_set_fev3<K,v_fes>::operator()(Stack s)  const
   ffassert( aa.size() == Vh.N);
   for (int i=0;i<dim;i++)
     tabexp[i]=aa[i]; 
-  
+  KN< K > *xx = fe.x(); // get array
+    bool change = !xx || (xx->N() != Vh.NbOfDF)|| (pVho && pVho != &Vh);
+
   KN<K> * y=new  KN<K>(Vh.NbOfDF);
   KN<K> & yy(*y);
   int npPh = Vh.maxNbPtforInterpolation;
@@ -1940,7 +1985,11 @@ AnyType E_set_fev3<K,v_fes>::operator()(Stack s)  const
 	   sptr->clean(); // modif FH mars 2006  clean Ptr          
 	 } 
     }
-  fe=y;
+  if(change) fe = y;// change the array pointeur
+  else {
+      *fe.x() = yy;//  copy value in new value in old vector
+      delete y;
+  }
   if (copt) delete [] copt;
   *MeshPointStack(s) = mp;
   if(verbosity>1)
@@ -2971,6 +3020,7 @@ void init_lgmesh3() {
   TheOperators->Add("=", new OneOperator2<pmeshL*,pmeshL*,pmeshL >(&set_eqdestroy_incr));
 
   Global.Add("readmesh3","(",new OneOperatorCode<ReadMesh3>);
+    
   Global.Add("readmeshS","(",new OneOperatorCode<ReadMeshS>);
   Global.Add("readmeshL","(",new OneOperatorCode<ReadMeshL>);
   Global.Add("savemesh","(",new OneOperatorCode<SaveMesh3>);

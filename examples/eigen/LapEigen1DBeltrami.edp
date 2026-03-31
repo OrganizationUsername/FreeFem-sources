@@ -1,4 +1,4 @@
-// test to validate the addition of surfacic finite elements in FreeFEM
+// test to validate the addition of surfacis finite elements in FreeFEM
 
 load "medit"
 
@@ -6,13 +6,13 @@ load "medit"
 /////variational form
 
 /////////////////////////////////
-// laplacian 2D
+// laplacian 1D
 real R = 3, r=1; 
-real h = 0.1; // 
+real h = 0.01; // 
 int nx = R*2*pi/h;
-func torex= (R+r*cos(y*pi*2))*cos(x*pi*2);
-func torey= (R+r*cos(y*pi*2))*sin(x*pi*2);
-func torez= r*sin(y*pi*2);
+func torex= (R+r*cos(x*pi*10))*cos(x*pi*2);
+func torey= (R+r*cos(x*pi*10))*sin(x*pi*2);
+func torez= r*sin(x*pi*4);
 
 
 meshL Th=segment(nx,[torex,torey,torez],removeduplicate=true) ;
@@ -34,5 +34,9 @@ Vh[int] eV(nev);   // to store nev eigen vector
 int k=EigenValue(A,B,sym=true,sigma=sigma,value=ev,vector=eV,tol=1e-10,maxit=0,ncv=0,which="LM"); // which="LM" default 
 
 for (int i=0;i<k;i++) 
-	plot(eV[i],cmm=" (new plot in test) Eigen  Vector "+i+" valeur =" + ev[i]  ,wait=1,value=1,dim=3,fill=1,CutPlane=0,ShowAxes=1, nbiso=40);  
-
+{
+	meshL Thm = movemesh(Th,[x,y,z+3*eV[i]]);
+	fespace Wh(Thm,P1);
+	Wh ew; ew[]=eV[i][];
+	plot(Th,ew,Thm,cmm=" (new plot in test) Eigen  Vector "+i+" valeur =" + ev[i]  ,wait=1,value=1,dim=3,fill=1,CutPlane=0,ShowAxes=1, nbiso=40);  
+}

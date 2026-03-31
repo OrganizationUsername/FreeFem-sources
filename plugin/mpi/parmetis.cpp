@@ -28,7 +28,19 @@
 
 #include <ff++.hpp>
 #include <cmath>
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
 #include <parmetis.h>
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic pop
+#endif
 #ifndef IDX_T
 #define IDX_T MPI_INT
 #endif
@@ -140,7 +152,7 @@ AnyType ParMETIS_Op<Type, Mesh>::operator()(Stack stack) const {
         idx_t edgecut;
         real_t* tpwgts = new real_t[nparts];
         for(int i = 0; i < nparts; ++i)
-            tpwgts[i] = 1.0 / static_cast<real_t>(nparts);
+            tpwgts[i] = static_cast<real_t>(1.0) / static_cast<real_t>(nparts);
         real_t ubvec = 1.05;
         idx_t* part = ptInt + vtxdist[rank];
         ParMETIS_V3_PartKway(vtxdist, xadg, adjncy.data(), NULL, NULL, &wgtflag, &wgtflag, &ncon, &nparts, tpwgts, &ubvec, &wgtflag, &edgecut, part, &workComm);

@@ -5,14 +5,6 @@
 
 #include "common_hpddm.hpp"
 
-#if PETSC_VERSION_LT(3, 18, 0)
-#define MATHERMITIANTRANSPOSEVIRTUAL MATTRANSPOSEMAT
-#endif
-
-#if PETSC_VERSION_LT(3, 19, 0)
-#define PETSC_SUCCESS 0
-#endif
-
 namespace PETSc {
 template<class HpddmType>
 class DistributedCSR {
@@ -103,7 +95,7 @@ void globalMapping(HpddmType* const& A, PetscInt*& num, PetscInt& start, PetscIn
     A->template globalMapping<'C'>(num, num + A->getDof(), start, end, global, A->getScaling(), list);
 }
 template<class HpddmType, typename std::enable_if<!std::is_same<HpddmType, HpSchwarz<PetscScalar>>::value>::type* = nullptr>
-void globalMapping(HpddmType* const& A, PetscInt* const& num, PetscInt& start, PetscInt& end, long long& global, PetscInt* const list) { }
+void globalMapping(HpddmType* const&, PetscInt* const&, PetscInt&, PetscInt&, long long&, PetscInt* const) { }
 template<class Type, class Tab, typename std::enable_if<!std::is_same<Tab, PETSc::DistributedCSR<HpSchwarz<PetscScalar>>>::value>::type* = nullptr>
 void setVectorSchur(Type* ptA, KN<Tab>* const& mT, KN<double>* const& pL) {
     int *is, *js;
@@ -116,6 +108,7 @@ void setVectorSchur(Type* ptA, KN<Tab>* const& mT, KN<double>* const& pL) {
     PetscInt* num;
     PetscInt start, end;
     long long global;
+    ffassert(ptA->_A);
     ptA->_A->clearBuffer();
     globalMapping(ptA->_A, num, start, end, global, re);
     delete [] re;
@@ -178,7 +171,7 @@ void setVectorSchur(Type* ptA, KN<Tab>* const& mT, KN<double>* const& pL) {
         }
         else {
             PetscBool update = (mS && ptA->_ksp ? PETSC_TRUE : PETSC_FALSE);
-            MPI_Allreduce(MPI_IN_PLACE, &update, 1, MPIU_BOOL, MPI_MAX, ptA->_A->getCommunicator());
+            MPI_Allreduce(MPI_IN_PLACE, &update, 1, MPI_C_BOOL, MPI_MAX, ptA->_A->getCommunicator());
             if(update) {
                 Mat S;
                 MatCreate(PetscObjectComm((PetscObject)ptA->_ksp), &S);
@@ -301,16 +294,7 @@ void setCompositePC(PC pc, const std::vector<Mat>* S) {
         KSPSetOperators(subksp[nsplits - 1], (*S)[0], (*S)[0]);
         if(S->size() == 1) {
             IS is;
-#if PETSC_VERSION_GE(3,12,0)
             PCFieldSplitGetISByIndex(pc, nsplits - 1, &is);
-#else
-            const char* prefixPC;
-            PCGetOptionsPrefix(pc, &prefixPC);
-            const char* prefixIS;
-            KSPGetOptionsPrefix(subksp[nsplits - 1], &prefixIS);
-            std::string str = std::string(prefixIS).substr((prefixPC ? std::string(prefixPC).size() : 0) + std::string("fieldsplit_").size(), std::string(prefixIS).size() - ((prefixPC ? std::string(prefixPC).size() : 0) + std::string("fieldsplit_").size() + 1));
-            PCFieldSplitGetIS(pc, str.c_str(), &is);
-#endif
             PetscObjectCompose((PetscObject)is, "pmat", (PetscObject)(*S)[0]);
         }
         else {
@@ -319,13 +303,8 @@ void setCompositePC(PC pc, const std::vector<Mat>* S) {
             PCSetType(pcS, PCCOMPOSITE);
             PetscInt j;
             PCCompositeGetNumberPC(pcS, &j);
-            for(int i = j; i < S->size(); ++i) {
-#if PETSC_VERSION_GE(3,15,0)
+            for(int i = j; i < S->size(); ++i)
                 PCCompositeAddPCType(pcS, PCNONE);
-#else
-                PCCompositeAddPC(pcS, PCNONE);
-#endif
-            }
             PCSetUp(pcS);
             for(int i = 0; i < S->size(); ++i) {
                 PC subpc;

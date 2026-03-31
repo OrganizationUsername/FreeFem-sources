@@ -125,11 +125,6 @@ extern long verbosity;
 extern FILE *ThePlotStream;    //  Add for new plot. FH oct 2008
 void init_lgmesh( );
 
-namespace FreeFempp {
-  template< class R >
-  TypeVarForm< R > *TypeVarForm< R >::Global;
-}
-
 basicAC_F0::name_and_type OpCall_FormBilinear_np::name_param[] = {
   {"bmat", &typeid(Matrice_Creuse< R > *)}, LIST_NAME_PARM_MAT,
   // param for bem solver
@@ -2089,6 +2084,12 @@ AnyType pfer2R(Stack s, const AnyType &a) {
   return SetAny< R >(rr);
 }
 
+#if defined(__clang__) && defined(__has_warning)
+#if __has_warning("-Wundefined-var-template")
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-var-template"
+#endif
+#endif
 template< class R >
 AnyType set_fe(Stack s, Expression ppfe, Expression e) {
   long kkff = Mesh::kfind, kkth = Mesh::kthrough;
@@ -2097,6 +2098,7 @@ AnyType set_fe(Stack s, Expression ppfe, Expression e) {
   MeshPoint *mps = MeshPointStack(s), mp = *mps;
   pair< FEbase< R, v_fes > *, int > pp = GetAny< pair< FEbase< R, v_fes > *, int > >((*ppfe)(s));
   FEbase< R, v_fes > &fe(*pp.first);
+  const FESpace *pVho = fe.Vh;
   const FESpace *pVh(fe.newVh( ));
 
   if (!pVh) ExecError("Unset FEspace (Null mesh ? ) on  uh= ");
@@ -2111,8 +2113,13 @@ AnyType set_fe(Stack s, Expression ppfe, Expression e) {
          << endl;
     ExecError(" Error interploation (set)  FE function (vectorial) with a scalar");
   }
-  KN< R > *y = new KN< R >(Vh.NbOfDF);
-  KN< R > &yy(*y);
+  KN< R > *xx = fe.x(); // get array
+  bool change = !xx || (xx->N() != Vh.NbOfDF)|| (pVho && pVho != pVh);
+  
+  KN< R > *y =  new KN< R >(Vh.NbOfDF) ; // alway change the result array to
+    // write   u = u*2; if same memory => bug !
+    // so new array F.H. 5/11/25
+  KN_< R > &yy(*y);
   KN< R > Viso(100);
   for (int i = 0; i < Viso.N( ); i++) Viso[i] = 0.01 * i;
 
@@ -2162,15 +2169,24 @@ AnyType set_fe(Stack s, Expression ppfe, Expression e) {
       sptr->clean( );    // modif FH mars 2006  clean Ptr
     }
   *mps = mp;
-  fe = y;
+  if(change) fe = y;// change the array pointeur
+  else {
+      *fe.x() = yy;//  copy value in new value in old vector
+      delete y;
+  }
   kkff = Mesh::kfind - kkff;
   kkth = Mesh::kthrough - kkth;
 
   if (verbosity > 1)
-    ShowBound(*y, cout) << " " << kkth << "/" << kkff << " =  "
-                        << double(kkth) / Max< double >(1., kkff) << endl;
+    ShowBound(*fe.x(), cout) << " " << kkth << "/" << kkff << " =  "
+                        << double(kkth) / Max< double >(1., kkff) << " change " << change << endl;
   return SetAny< FEbase< R, v_fes > * >(&fe);
 }
+#if defined(__clang__) && defined(__has_warning)
+#if __has_warning("-Wundefined-var-template")
+#pragma clang diagnostic pop
+#endif
+#endif
 AnyType set_feoX_1(Stack s, Expression ppfeX_1, Expression e) {    // inutile
                                                                    // meme chose que  v(X1,X2);
   StackOfPtr2Free *sptr = WhereStackOfPtr2Free(s);
@@ -2276,6 +2292,7 @@ AnyType E_set_fev< K >::Op2d(Stack s) const {
   MeshPoint *mps = MeshPointStack(s), mp = *mps;
   FEbase< K, v_fes > **pp = GetAny< FEbase< K, v_fes > ** >((*ppfe)(s));
   FEbase< K, v_fes > &fe(**pp);
+  const FESpace *pVho = fe.Vh;
   const FESpace &Vh(*fe.newVh( ));
   KN< K > gg(Vh.MaximalNbOfDF( ));
 
@@ -2301,6 +2318,8 @@ AnyType E_set_fev< K >::Op2d(Stack s) const {
   TabFuncArg tabexp(s, Vh.N);
   ffassert(aa.size( ) == Vh.N);
   for (int i = 0; i < dim; i++) tabexp[i] = aa[i];
+  KN< K > *xx = fe.x(); // get array
+    bool change = !xx || (xx->N() != Vh.NbOfDF)|| (pVho && pVho != &Vh);
 
   KN< K > *y = new KN< K >(Vh.NbOfDF);
   KN< K > &yy(*y);
@@ -2370,10 +2389,16 @@ AnyType E_set_fev< K >::Op2d(Stack s) const {
 
       for (int df = 0; df < nbdf; df++) yy[Kt(df)] = gg[df];
     }
-  fe = y;
+  if(change)
+    fe = y;
+  else {
+      *fe.x() = yy;//  copy value in new value in old vector
+      delete y;
+  }
+
   if (copt) delete[] copt;
   *MeshPointStack(s) = mp;
-  if (verbosity > 1) ShowBound(*y, cout) << endl;
+  if (verbosity > 1) ShowBound(*fe.x(), cout) << endl;
   return Nothing;
 }
 
@@ -6850,6 +6875,11 @@ void init_lgfem( ) {
   TheOperators->Add("<-", new OpMatrixtoBilinearFormVG< double >(1));     // 
   TheOperators->Add("<-", new OpMatrixtoBilinearFormVG< Complex >(1));    // 
 
+ // affectation d'une matrice à partir d'une forme bilinéaire dans le cas composite FESpace.
+    // missing FH ..
+    TheOperators->Add("=", new OpMatrixtoBilinearFormVG< double >());     //
+    TheOperators->Add("=", new OpMatrixtoBilinearFormVG< Complex >());    //
+
   // construction of an array with an linear form in composite FESpace.
   TheOperators->Add("<-", 
     new OpArraytoLinearFormVG< double >(atype< KN< double > * >( ), true, true),
@@ -7310,102 +7340,20 @@ E_F0 *Op_CopyArray::code(const basicAC_F0 &args) const {
   int na = a.size( );
   int nb = b.size( );
   if (na != nb) CompileError("Copy of Array with incompatible size!");
-  if (0) {    // old code !!!!!!! before removing FH sept. 2009
-    Expression rr = 0, rrr, iii;
-    //  try real voctor value FE interpolation
-    rr = IsFEcomp< double, v_fes >(a[0], 0, rrr, iii);
-    if (rr != 0) {
-      for (int i = 1; i < nb; i++)
-        if (!IsFEcomp< double, v_fes >(a[i], i, rrr, iii))
-          CompileError("Copy of Array with incompatible real vector value FE function () !");
-      ;
-      return new E_set_fev< double >(&b, rr, 2);
-    }
-    //  try complex vector value FE interpolation
-
-    rr = IsFEcomp< Complex, v_fes >(a[0], 0, rrr, iii);
-    if (rr != 0) {
-      for (int i = 1; i < nb; i++)
-        if (!IsFEcomp< Complex, v_fes >(a[i], i, rrr, iii))
-          CompileError("Copy of Array with incompatible complex vector value FE function () !");
-      ;
-      return new E_set_fev< Complex >(&b, rr, 2);
-    }
-
-    rr = IsFEcomp< double, v_fes3 >(a[0], 0, rrr, iii);
-    if (rr != 0) {
-      for (int i = 1; i < nb; i++)
-        if (!IsFEcomp< double, v_fes3 >(a[i], i, rrr, iii))
-          CompileError("Copy of Array with incompatible real vector value FE function () !");
-      ;
-      return new E_set_fev3< double, v_fes3 >(&b, rr);
-    }
-    //  try complex vector value FE interpolation
-
-    rr = IsFEcomp< Complex, v_fes3 >(a[0], 0, rrr, iii);
-    if (rr != 0) {
-      for (int i = 1; i < nb; i++)
-        if (!IsFEcomp< Complex, v_fes3 >(a[i], i, rrr, iii))
-          CompileError("Copy of Array with incompatible complex vector value FE function () !");
-      ;
-      return new E_set_fev3< Complex, v_fes3 >(&b, rr);
-    }
-      
-        rr = IsFEcomp< double, v_fesS >(a[0], 0, rrr, iii);
-        if (rr != 0) {
-        for (int i = 1; i < nb; i++)
-        if (!IsFEcomp< double, v_fesS >(a[i], i, rrr, iii))
-        CompileError("Copy of Array with incompatible real vector value FE function () !");
-        ;
-        return new E_set_fev3< double, v_fesS >(&b, rr);
-        }
-        //  try complex vector value FE interpolation
-        
-        rr = IsFEcomp< Complex, v_fesS >(a[0], 0, rrr, iii);
-        if (rr != 0) {
-        for (int i = 1; i < nb; i++)
-        if (!IsFEcomp< Complex, v_fesS >(a[i], i, rrr, iii))
-        CompileError("Copy of Array with incompatible complex vector value FE function () !");
-        ;
-        return new E_set_fev3< Complex, v_fesS >(&b, rr);
-        }
-     
-        rr = IsFEcomp< double, v_fesL >(a[0], 0, rrr, iii);
-        if (rr != 0) {
-        for (int i = 1; i < nb; i++)
-        if (!IsFEcomp< double, v_fesL >(a[i], i, rrr, iii))
-        CompileError("Copy of Array with incompatible real vector value FE function () !");
-        ;
-        return new E_set_fev3< double, v_fesL >(&b, rr);
-        }
-        //  try complex vector value FE interpolation
-        
-        rr = IsFEcomp< Complex, v_fesL >(a[0], 0, rrr, iii);
-        if (rr != 0) {
-        for (int i = 1; i < nb; i++)
-        if (!IsFEcomp< Complex, v_fesL >(a[i], i, rrr, iii))
-        CompileError("Copy of Array with incompatible complex vector value FE function () !");
-        ;
-        return new E_set_fev3< Complex, v_fesL >(&b, rr);
-        }
-        }
-        
-        
-        
-        else {
-    Expression r = 0;    // new code FH sep 2009.
-    if (!r) r = Op_CopyArrayT< double, v_fes >(a, b);
-    if (!r) r = Op_CopyArrayT< Complex, v_fes >(a, b);
-    if (!r) r = Op_CopyArrayT< double, v_fes3 >(a, b);
-    if (!r) r = Op_CopyArrayT< Complex, v_fes3 >(a, b);
-    if (!r) r = Op_CopyArrayT< double, v_fesS >(a, b);
-    if (!r) r = Op_CopyArrayT< Complex, v_fesS >(a, b);
-    if (!r) r = Op_CopyArrayT< double, v_fesL >(a, b);
-    if (!r) r = Op_CopyArrayT< Complex, v_fesL >(a, b);
-    if (r) return r;
+  Expression r = 0;    // new code FH sep 2009.
+  if (!r) r = Op_CopyArrayT< double, v_fes >(a, b);
+  if (!r) r = Op_CopyArrayT< Complex, v_fes >(a, b);
+  if (!r) r = Op_CopyArrayT< double, v_fes3 >(a, b);
+  if (!r) r = Op_CopyArrayT< Complex, v_fes3 >(a, b);
+  if (!r) r = Op_CopyArrayT< double, v_fesS >(a, b);
+  if (!r) r = Op_CopyArrayT< Complex, v_fesS >(a, b);
+  if (!r) r = Op_CopyArrayT< double, v_fesL >(a, b);
+  if (!r) r = Op_CopyArrayT< Complex, v_fesL >(a, b);
+  if (r) return r;
+  else {
+    CompileError("Internal Error: General Copy of Array : to do ");
+    return ret;
   }
-  CompileError("Internal Error: General Copy of Array : to do ");
-  return ret;
 }
 
 template< class v_fes, int DIM >

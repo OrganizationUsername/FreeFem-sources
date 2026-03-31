@@ -61,9 +61,16 @@ template<class R>
 KNM_<R> & KNM_<R>::operator oper (const ConjKNM_<R> & u)
 {
     K_throwassert( N() == u.N() && M() == u.M() );
-  for(int i=0;i<N();++i)
-    for(int j=0;j<M();++j)
+  if (this->v != u.t().v)
+    for(int i=0;i<N();++i)
+      for(int j=0;j<M();++j)
         KNM_<R>::operator () (i,j) oper RNM::conj( u(i,j));
+  else {
+    KNM<R> v(u);
+    for(int i=0;i<N();++i)
+      for(int j=0;j<M();++j)
+        KNM_<R>::operator () (i,j) oper RNM::conj( v(i,j));
+  }
     return *this;
 }
 

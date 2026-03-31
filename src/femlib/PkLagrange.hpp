@@ -337,7 +337,7 @@ public:
             Rd Dl[dHat+1];
             Rd DDl[dHat+1][d];
             K.Gradlambda(Dl);
-            KN<Rd> df(this->NbDoF),ddf(this->NbDoF*dHat);
+            KN<Rd> df(this->NbDoF),ddf(this->NbDoF*d);
             
             for( int dof = 0,m=0; dof < this->NbDoF; ++dof)
                 {

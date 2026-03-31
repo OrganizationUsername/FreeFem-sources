@@ -27,6 +27,13 @@
  */
 #ifndef PROBLEM_HPP_
 #define PROBLEM_HPP_
+
+#include <limits>
+namespace FreeFempp {
+template<class R>
+class TypeVarForm;
+}
+
 extern Block *currentblock;
 
 template<class K> class Matrice_Creuse;
@@ -136,7 +143,7 @@ class C_args: public E_F0mps  {public:
           }
         else
           largs.push_back(args[i]);
-      };}
+      }}
   static ArrayOfaType  typeargs() { return ArrayOfaType(true);}
   AnyType operator()(Stack ) const  { return SetAny<const C_args *>(this);}
   operator aType () const { return atype<const C_args *>();}
@@ -321,14 +328,14 @@ public:
   vector<Expression> what;
   vector<int> whatis; // 0 -> long , 1 -> array ???
   CDomainOfIntegration( const basicAC_F0 & args,typeofkind b=int2d,int ddim=2,int ddHat=0) // 3d
-    :kind(b),d(ddim),dHat(ddHat==0 ? d : ddHat), Th(0), what(args.size()-1),whatis(args.size()-1)
+    :kind(b),d(ddim),dHat(ddHat==0 ? d : ddHat), Th(nullptr), what(args.size()-1),whatis(args.size()-1)
 
   {
       
   //  isMeshS=surface;
  //   isMeshL=curve;
-    mapt[0]=mapt[1]=mapt[2]=0; // no map of intergration points for test function
-    mapu[0]=mapu[1]=mapu[2]=0; // no map of intergration points for unknows function
+    mapt[0]=mapt[1]=mapt[2]=nullptr; // no map of intergration points for test function
+    mapu[0]=mapu[1]=mapu[2]=nullptr; // no map of intergration points for unknows function
     args.SetNameParam(n_name_param,name_param,nargs);
     if(d==2) // 2d
       Th=CastTo<pmesh>(args[0]);
@@ -381,7 +388,7 @@ public:
   double  binside(Stack s) const { return nargs[6] ? GetAny<double>( (*(nargs[6]))(s) )  : 0;} // truc pour FH
   bool intmortar(Stack s) const { return nargs[7] ? GetAny<bool>( (*(nargs[7])) (s) )  : 1;} // truc  pour
   double levelset(Stack s) const { return nargs[9] ? GetAny<double>( (*(nargs[9]))(s) )  : 0;}
-  bool  islevelset() const { return nargs[9] != 0; }
+  bool  islevelset() const { return nargs[9] != nullptr; }
   bool withmap() const {return mapu[0] || mapt[0]; }
 };
 
@@ -515,9 +522,9 @@ public:
     MatriceCreuse<double_st>  * AcadnaR;
     MatriceCreuse<cmplx_st>  * AcadnaC;
 
-    void init()  {pTh=0; AcadnaR=0;AcadnaC=0; Uh.init(),Vh.init();AR.init();AC.init();}
+    void init()  {pTh=nullptr; AcadnaR=nullptr;AcadnaC=nullptr; Uh.init(),Vh.init();AR.init();AC.init();}
     void destroy() {
-      pTh=0;
+      pTh=nullptr;
       Uh.destroy();
       Vh.destroy();
       AR.destroy();
@@ -534,7 +541,7 @@ public:
 
     CountPointer<MatriceCreuse<double> > ARglobal;
     CountPointer<MatriceCreuse<Complex> > ACglobal;
-    void init()  { pThU=0; pThV=0; ARglobal.init(); ACglobal.init();}
+    void init()  { pThU=nullptr; pThV=nullptr; ARglobal.init(); ACglobal.init();}
     void destroy() {
       if(pThU){
         if(! pThU->empty()){
@@ -698,7 +705,7 @@ public:
   Expression ppfes;
 
   Call_FormLinear(Expression * na,Expression  LL, Expression ft) ;
-  AnyType operator()(Stack stack) const
+  AnyType operator()(Stack) const
   { InternalError(" bug: no eval of Call_FormLinear ");}
    operator aType () const { return atype<void>();}
 
@@ -716,7 +723,7 @@ public:
   Expression ppfes;
 
   Call_FormLinear(Expression * na,Expression  LL, Expression ft);
-  AnyType operator()(Stack stack) const
+  AnyType operator()(Stack) const
   { InternalError(" bug: no eval of Call_FormLinear ");}
    operator aType () const { return atype<void>();}
 
@@ -733,7 +740,7 @@ public:
   const int N,M;
   Expression euh,evh;
   Call_FormBilinear(Expression * na,Expression  LL, Expression fi,Expression fj) ;
-  AnyType operator()(Stack stack) const
+  AnyType operator()(Stack) const
   { InternalError(" bug: no eval of Call_FormBilinear ");}
   
 operator aType () const { return atype<void>();}
@@ -751,7 +758,7 @@ public:
   const int N,M;
   Expression euh,evh;
   Call_CompositeFormBilinear(Expression * na,Expression  LL, Expression fi,Expression fj) ;
-  AnyType operator()(Stack stack) const
+  AnyType operator()(Stack) const
   { InternalError(" bug: no eval of Call_CompositeFormBilinear ");}
   
 operator aType () const { return atype<void>();}
@@ -1004,29 +1011,29 @@ extern Block *currentblock;
 
 class TypeFormOperator: public ForEachType<const C_args*> {
 public:
-  TypeFormOperator() : ForEachType<const C_args*>(0,0) {}
+  TypeFormOperator() : ForEachType<const C_args*>(nullptr,nullptr) {}
   void SetArgs(const ListOfId *lid) const {
     SetArgsFormLinear(lid,2);    }
 
-  Type_Expr SetParam(const C_F0 & c,const ListOfId *l,size_t & top) const
+  Type_Expr SetParam(const C_F0 & c,const ListOfId *,size_t &) const
   { return Type_Expr(this,CastTo(c));}
 
-  inline  C_F0 Initialization(const Type_Expr & e) const {return C_F0();}
+  inline  C_F0 Initialization(const Type_Expr &) const {return C_F0();}
 
 };
 
 class TypeFormBilinear: public ForEachType<const FormBilinear*> {
 public:
-  TypeFormBilinear() : ForEachType<const FormBilinear*>(0,0) {}
+  TypeFormBilinear() : ForEachType<const FormBilinear*>(nullptr,nullptr) {}
   void SetArgs(const ListOfId *lid) const {
     SetArgsFormLinear(lid,2);
   }
 
-  Type_Expr SetParam(const C_F0 & c,const ListOfId *l,size_t & top) const
+  Type_Expr SetParam(const C_F0 & c,const ListOfId *,size_t &) const
   { return Type_Expr(this,CastTo(c));}
 
 
-  C_F0 Initialization(const Type_Expr & e) const
+  C_F0 Initialization(const Type_Expr &) const
   {
     // cout << "Initialization " << *e.first << endl;
     return C_F0(); }  // nothing to initialize
@@ -1095,16 +1102,16 @@ public:
 
 class TypeFormLinear: public ForEachType<const FormLinear*> {
 public:
-  TypeFormLinear() : ForEachType<const FormLinear*>(0,0) {}
+  TypeFormLinear() : ForEachType<const FormLinear*>(nullptr,nullptr) {}
 
   void SetArgs(const ListOfId *lid) const {
     SetArgsFormLinear(lid,1);  }
 
-  Type_Expr SetParam(const C_F0 & c,const ListOfId *l,size_t & top) const
+  Type_Expr SetParam(const C_F0 & c,const ListOfId *,size_t &) const
   { return Type_Expr(this,CastTo(c));}
   //  {  return Type_Expr(c.left(),c.LeftValue());  } //
 
-  C_F0 Initialization(const Type_Expr & e) const
+  C_F0 Initialization(const Type_Expr &) const
   {  return C_F0(); }  // nothing to initialize
 
 };
@@ -1136,7 +1143,7 @@ public:
     {
         VMat *pvm=pMC();
         if(pvm) pvm->SetSolver();
-        pvm=0; // del solver before the del of the real matrix...
+        pvm=nullptr; // del solver before the del of the real matrix...
        A.destroy();
     }
 //else count--;
@@ -1170,7 +1177,7 @@ public:
       
   }
   void increment(){ count++;}
-    VMat *pMC()  {return A ? ( MatriceCreuse<K> *)A:0; }
+    VMat *pMC()  {return A ? ( MatriceCreuse<K> *)A:nullptr; }
     HMat *pHM()  {return dynamic_cast<HashMatrix<int,K> *>(pMC());}
 };
 
@@ -1231,7 +1238,7 @@ template<class K> class Matrice_Creuse_Transpose;
 
 template<class K>  ostream & operator << (ostream & f,const Matrice_Creuse<K> & A)
 { if ( !A.A) f << " unset sparse matrix " << endl;
-  else A.A->dump(f);  ;
+  else A.A->dump(f);
  return f;  }
 
 template<class K>  istream & operator >> (istream & f,Matrice_Creuse<K> & A)
@@ -1275,7 +1282,7 @@ template<class K> class Matrice_Creuse_inv_trans  { public:// add aug 2018 FH.
 
 namespace Fem2D {
 
-  inline void F_Pi_h(R* v, const R2 & P,const baseFElement & K,int i,const R2 & Phat,void * arg)
+  inline void F_Pi_h(R* v, const R2 & P,const baseFElement & K,int,const R2 & Phat,void * arg)
   {
     TabFuncArg &tabe(*(TabFuncArg*)arg);
     //MeshPoint & mp = *MeshPointStack(tabe.s);
@@ -1286,7 +1293,7 @@ namespace Fem2D {
 
   }
 
-  inline void FoX_1_Pi_h(R* v, const R2 & P,const baseFElement & K,int i,const R2 & Phat,void * arg)
+  inline void FoX_1_Pi_h(R* v, const R2 & P,const baseFElement & K,int,const R2 & Phat,void * arg)
   {
     TabFuncArg &tabe(*(TabFuncArg*)arg);
     MeshPointStack(tabe.s)->set(P,Phat,K);
@@ -1352,7 +1359,6 @@ AnyType OpArraytoLinearForm<R,MMesh,v_fes>::Op::operator()(Stack stack)  const
 {
   typedef v_fes *pfes;
   typedef typename  v_fes::FESpace FESpaceT;
-  typedef typename  FESpaceT::FElement FElementT;
   /*typedef typename  MMesh::Element ElementT;
   typedef typename  MMesh::Vertex VertexT;
   typedef typename  MMesh::RdHat RdHatT;
@@ -1379,11 +1385,38 @@ AnyType OpArraytoLinearForm<R,MMesh,v_fes>::Op::operator()(Stack stack)  const
      ffassert(px->N() == NbOfDF);
    }
   KN_<R>  xx( px ? *(KN_<R> *) px : GetAny<KN_<R> >((*x)(stack) ));
-  if(zero && NbOfDF )
-   xx=R();
+  KN<R> cc;
+    list<C_F0>::const_iterator ii,ib=l->largs.begin(),
+    ie=l->largs.end();
+    using namespace FreeFempp;
+    TypeVarForm<R> *tvf=FreeFempp::TypeVarForm<R>::Global;
+    assert( tvf);
+    bool ret = false;
+    for (ii=ib;ii != ie;ii++)
+    {
+        if (ii->left() == tvf->tBC) {
+            ret=true;
+            continue;
+        }
+    }
+  if(zero && NbOfDF)
+    xx=R();
+  else if(!zero && NbOfDF && ret) {
+    cc.resize(xx.n);
+    cc = xx;
+  }
 
-  if (  pVh && AssembleVarForm<R,MatriceCreuse<R>,MMesh,FESpaceT,FESpaceT>(stack,Vh.Th,Vh,Vh,false,0,&xx,l->largs) )
-    AssembleBC<R,MMesh,FESpaceT,FESpaceT>(stack,Vh.Th,Vh,Vh,false,0,&xx,0,l->largs,tgv);
+  if (  pVh && AssembleVarForm<R,MatriceCreuse<R>,MMesh,FESpaceT,FESpaceT>(stack,Vh.Th,Vh,Vh,false,0,&xx,l->largs) ) {
+    if (!zero && NbOfDF && ret) {
+      KN<R> bb(xx.n, std::numeric_limits<double>::lowest());
+      AssembleBC<R,MMesh,FESpaceT,FESpaceT>(stack,Vh.Th,Vh,Vh,false,0,&bb,0,l->largs,tgv);
+      for(int i = 0; i < xx.n; ++i)
+        if(bb[i] != std::numeric_limits<double>::lowest())
+          xx[i] = cc[i] + bb[i];
+    }
+    else
+      AssembleBC<R,MMesh,FESpaceT,FESpaceT>(stack,Vh.Th,Vh,Vh,false,0,&xx,0,l->largs,tgv);
+  }
   return SetAny<KN_<R> >(xx);
 }
 
@@ -1506,7 +1539,7 @@ AnyType OpArraytoLinearFormVG<R>::Op::operator()(Stack stack)  const
 
         if( (*pCompoVh)->typeFE[j] == 2 ){
           // 2d Mesh 
-          FESpace * pVh = (FESpace*) (*pCompoVh)->vect[j]->getpVh();;
+          FESpace * pVh = (FESpace*) (*pCompoVh)->vect[j]->getpVh();
           FESpace & Vh = *pVh;
 
           if (  pVh && AssembleVarForm<R,MatriceCreuse<R>,Mesh,FESpace,FESpace>(stack,Vh.Th,Vh,Vh,false,0,&xxblock2,b_largs) )
@@ -1514,7 +1547,7 @@ AnyType OpArraytoLinearFormVG<R>::Op::operator()(Stack stack)  const
 
         }else if( (*pCompoVh)->typeFE[j] == 3 ){
           // 3d Mesh
-          FESpace3 * pVh = (FESpace3*) (*pCompoVh)->vect[j]->getpVh();;
+          FESpace3 * pVh = (FESpace3*) (*pCompoVh)->vect[j]->getpVh();
           FESpace3 & Vh = *pVh;
 
           if (  pVh && AssembleVarForm<R,MatriceCreuse<R>,Mesh3,FESpace3,FESpace3>(stack,Vh.Th,Vh,Vh,false,0,&xxblock2,b_largs) )
@@ -1522,7 +1555,7 @@ AnyType OpArraytoLinearFormVG<R>::Op::operator()(Stack stack)  const
 
         }else if( (*pCompoVh)->typeFE[j] == 4 ){
           // 3d Surface Mesh 
-          FESpaceS * pVh = (FESpaceS*) (*pCompoVh)->vect[j]->getpVh();;
+          FESpaceS * pVh = (FESpaceS*) (*pCompoVh)->vect[j]->getpVh();
           FESpaceS & Vh = *pVh;
 
           if (  pVh && AssembleVarForm<R,MatriceCreuse<R>,MeshS,FESpaceS,FESpaceS>(stack,Vh.Th,Vh,Vh,false,0,&xxblock2,b_largs) )
@@ -1530,7 +1563,7 @@ AnyType OpArraytoLinearFormVG<R>::Op::operator()(Stack stack)  const
 
         }else if( (*pCompoVh)->typeFE[j] == 5 ){
           // 3d Curve Mesh
-          FESpaceL * pVh = (FESpaceL*) (*pCompoVh)->vect[j]->getpVh();;
+          FESpaceL * pVh = (FESpaceL*) (*pCompoVh)->vect[j]->getpVh();
           FESpaceL & Vh = *pVh;
 
           if (  pVh && AssembleVarForm<R,MatriceCreuse<R>,MeshL,FESpaceL,FESpaceL>(stack,Vh.Th,Vh,Vh,false,0,&xxblock2,b_largs) )
@@ -1597,7 +1630,7 @@ struct CGMatVirtPreco : CGMatVirt<int,R>
     int n;
     MatriceMorse<R> *A;
     CGMatVirtPreco(Stack stack,const OneOperator* pprecon,MatriceMorse<R> *HA);
-     R * addmatmul(R *x,R *Ax)
+     R * addmatmul(R *,R *)
     {
 
     }
@@ -1610,20 +1643,12 @@ void creationBlockOfMatrixToBilinearForm( const FESpace1 * PUh, const FESpace2 *
 template<class R,class MMesh,class v_fes1,class v_fes2>
 AnyType OpMatrixtoBilinearForm<R,MMesh,v_fes1,v_fes2>::Op::operator()(Stack stack)  const
 {
-  typedef typename  MMesh::Element Element;
-  typedef typename  MMesh::Vertex Vertex;
-  typedef typename  MMesh::RdHat RdHat;
-  typedef typename  MMesh::Rd Rd;
     
   typedef typename  v_fes1::pfes pfes1;
   typedef typename  v_fes1::FESpace FESpace1;
-  typedef typename  FESpace1::Mesh Mesh1;
-  typedef typename  FESpace1::FElement FElement1;
     
   typedef typename  v_fes2::pfes pfes2;
   typedef typename  v_fes2::FESpace FESpace2;
-  typedef typename  FESpace2::Mesh Mesh2;
-  typedef typename  FESpace2::FElement FElement2;
   assert(b && b->nargs);// *GetAny<pfes * >
   pfes1  * pUh= GetAny<pfes1 *>((*b->euh)(stack));
   pfes2  * pVh= GetAny<pfes2 *>((*b->evh)(stack));
@@ -1752,6 +1777,8 @@ TypeVarForm() :
 
  static TypeVarForm *Global;
 };
+
+template<class R> TypeVarForm<R>* TypeVarForm<R>::Global = nullptr;
 
 }
 #endif

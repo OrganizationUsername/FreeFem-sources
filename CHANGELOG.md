@@ -2,6 +2,7 @@
 <!--
 ## [Version number]
 ### Added
+
 -
 
 ### Changed
@@ -22,7 +23,9 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+
 ### Added
+
 -
 
 ### Changed
@@ -37,7 +40,50 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 -
 
----
+## [4.16]
+
+### Added
+ Add support for ChangeNumbering with array of Mat and KNM
+ Add example of error indicator mesh adaptation in 3d see  examples/3d/adaptindicator3dP1.md
+ Add DG laplace problem in 1d  see examples/3dCurve/LapDG2-1d.edp
+### Changed
+-
+
+### Deprecated
+-
+
+### Removed
+-
+
+### Fixed
+    - missing check test in examples/3d with mmg plugins
+    - in meshL intallBE 
+    - correct P2ncL, P3ncL memory problem (typo)
+
+    - trunc of surface mesh, a bug can occur in case on non manifold case (memory fault)
+       (Thanks to PHT) 22/Sep/25, 24/Sep/25 recorrect because the basic trunc bugs (hard bug, conseptual ).
+    - in formal operation in array  (ie [1]-[1] is not [0] but [2], same for "./" and ".*" operator  ) 3/Sep/25
+    - fixed the size of block sparse matrix : the size zero matrix (expression  0) could be a positive number,
+    but the size of null Z,  ( `matrix Z(0,0);`) coubd be no negative :
+     matrix Z(0,0); matrix A = [[Z,1],[Z,1]];// A is 2x1 matrix : the size of first column is zero.
+     matrix B = [[0,1],[0,1]]; // B is 2x2 matrix
+
+    - bug in mat_interpolation of set of point with inside=true flag ( wrong set ) in 2d,3d, surface.
+    - pass LDFLAGS=@LDFLAGS@ to petsc  configure
+    - correct wrong assert in ClosePoints.cpp  (k<9) => (k<=9)
+    - correct  in interpolate(Vh,xx,yy,zz) du to copy past error :
+         Warning ambiguity Polymorphic Find 4
+    - Do not go through empty arrays to avoid false-positive assertion in: 
+
+>  real[int] a(2), b; real[int] c = [b, a, b, b];  assert(c.n == 2); 
+
+    - correct integer overflow in computation of nbvx in some big case in bluidmesh 
+    - correct chdir on windows if mix / and \ in path
+    - correct in ff-c++ the check of mpi
+    - Add `bem example` in Windows distrib
+    - correct windows install  (cf WindowsPackage.m4)
+    - correct in scan.cpp in case empty markdown section
+
 
 ## [4.15]
 
@@ -880,7 +926,8 @@ All notable changes to this project will be documented in this file.
 
 - The main distribution is now on Github
 
-[Unreleased]: https://github.com/FreeFem/FreeFem-sources/compare/v4.15..develop
+[Unreleased]: https://github.com/FreeFem/FreeFem-sources/compare/v4.16..develop
+[4.16]: https://github.com/FreeFem/FreeFem-sources/compare/v4.15..v4.16
 [4.15]: https://github.com/FreeFem/FreeFem-sources/compare/v4.14..v4.15
 [4.14]: https://github.com/FreeFem/FreeFem-sources/compare/v4.13..v4.14
 [4.13]: https://github.com/FreeFem/FreeFem-sources/compare/v4.12..v4.13

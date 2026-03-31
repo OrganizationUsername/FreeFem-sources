@@ -30,20 +30,25 @@ TESTS_HPDDM = diffusion-2d-thirdlevelgeneo.edp \
 	diffusion-3d-minimal-ddm.edp\
 	diffusion-3d-minimal-direct.edp \
 	diffusion-3d-simple.edp \
+	diffusion-2d-periodic.edp \
 	Helmholtz-2d-HPDDM-BGMRES.edp \
 	Helmholtz-2d-simple.edp \
+	Helmholtz-2d-ORAS-recursive.edp \
 	Helmholtz-3d-simple.edp \
 	Maxwell-3d-simple.edp \
 	natural_convection_3D_obstacle.edp \
 	natural_convection.edp \
 	Richards-2d.edp \
-	heat-torus-3d-surf.edp
+	heat-torus-3d-surf.edp \
+	elasticity-3d-deflateRBMs.edp
 # elasticity-3d-simple.edp <- deadlock on freefem-dev-2-windows10-vm2
 # elasticity-3d-thirdlevelgeneo.edp <- assertion failure on freefem-dev-2-windows10-vm2
 
-TESTS_METIS = Maxwell_Cobracavity.edp
+TESTS_METIS_HPDDM = Maxwell_Cobracavity.edp
 
 TESTS_BEM_HPDDM = Helmholtz_Cobracavity_BEM.edp Helmholtz_circle_BEM.edp Helmholtz-2d-FEM-BEM-coupling.edp Helmholtz-2d-interfaceBCs-comp.edp
+
+TESTS_PETSC_HPDDM = Helmholtz-2d-all.edp
 
 if MPI
 if HPDDM
@@ -51,6 +56,9 @@ CONDITIONAL_HPDDM = $(TESTS_HPDDM)
 if METIS
 CONDITIONAL_METIS_HPDDM = $(TESTS_METIS_HPDDM)
 endif METIS
+if PETSC
+CONDITIONAL_PETSC_HPDDM = $(TESTS_PETSC_HPDDM)
+endif PETSC
 if BOOST
 if BEMTOOL
 if HTOOL
@@ -63,10 +71,12 @@ endif MPI
 
 TESTS = $(TESTS_HPDDM) \
 	$(TESTS_METIS_HPDDM) \
+	$(TESTS_PETSC_HPDDM) \
 	$(TESTS_BEM_HPDDM)
 
 LIST_CONDITIONAL = $(CONDITIONAL_HPDDM) \
 	$(CONDITIONAL_METIS_HPDDM) \
+	$(CONDITIONAL_PETSC_HPDDM) \
 	$(CONDITIONAL_BEM_HPDDM)
 
 

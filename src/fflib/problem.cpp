@@ -1902,7 +1902,7 @@ template<class R>
             for( int k=ti0;k<ti1;k++) {
                 if (all || setoflab.find(Th[k].lab) != setoflab.end()) {
                     for( int ie=0;ie<2;ie++)
-                    A += mate(k,ie,Th[k].lab,&parammatElement_OpVF);
+                    A += mate(k,ie,Th[k].lab,paramate);
                     if(sptrclean) sptrclean=sptr->clean();
                 }
             }
@@ -6868,7 +6868,7 @@ pmeshS  pThdi = GetAny<pmeshS>((*b->di->Th)(stack));
                     {
                         R cc  =  GetAny<R>(ll.second.eval(stack));
                         //cout << *(copt[il]) << " == " <<  cc << endl;
-                        CheckErrorOptimisation(cc,ccc,"Sorry error in Optimization (e) add:  int2d(Th,optimize=0)(...)");
+                        CheckErrorOptimisation(cc,ccc,"Sorry error in Optimization (e) add:  int1d(Th,optimize=0)(...)");
                         /*if ( ccc != cc) {
                          cerr << cc << " != " << ccc << " => ";
                          cerr << "Sorry error in Optimization (e) add:  int2d(Th,optimize=0)(...)" << endl;
@@ -6925,13 +6925,8 @@ pmeshS  pThdi = GetAny<pmeshS>((*b->di->Th)(stack));
            if ( copt && ( mat.optim==1) && Kv.number <1)
            {
                R cc  =  GetAny<R>(ll.second.eval(stack));
-               //cout << *(copt[il]) << " == " <<  cc << endl;
-               CheckErrorOptimisation(cc,ccc,"Sorry error in Optimization (e) add:  int2d(Th,optimize=0)(...)");
-               /*if ( ccc != cc) {
-                cerr << cc << " != " << ccc << " => ";
-                cerr << "Sorry error in Optimization (e) add:  int2d(Th,optimize=0)(...)" << endl;
-                ExecError("In Optimized version "); }*/
-           }
+               CheckErrorOptimisation(cc,ccc,"Sorry error in Optimization (e) add:  intallBE(Th,optimize=0)(...)");
+            }
            int fi=Kv.dfcbegin(icomp);
            int li=Kv.dfcend(icomp);
            int fj=Ku.dfcbegin(jcomp);
@@ -10017,7 +10012,7 @@ bool AssembleVarForm(Stack stack,const MMesh & Th,const FESpace1 & Uh,const FESp
                             int ddf=K(df);
                             // AA(ddf,ddf) =tgv;
                             if (Aii)  onBC[ddf]='1'; ;//A->SetBC(ddf, tgv);// change 21 dec 2010 FH (Hack of ILU)
-                            if (B) (*B)[ddf]=  tgv1*gg[df];
+                            if (B) (*B)[ddf]=tgv1*gg[df];
                             if (X) (*X)[ddf]=gg[df];
                         }
                     }
@@ -14415,7 +14410,6 @@ template class Call_FormLinear<v_fes>;
 template class Call_FormLinear<v_fes3>;
 template class Call_FormLinear<v_fesS>;
 template class Call_FormLinear<v_fesL>;
-template class Call_FormLinear<vect_generic_v_fes>; // Morice: added vector FESpace (composite FESpace)
 
 template class Call_FormBilinear<v_fes,v_fes>;
 template class Call_FormBilinear<v_fes3,v_fes3>;

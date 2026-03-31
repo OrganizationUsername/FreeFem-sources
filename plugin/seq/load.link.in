@@ -11,6 +11,7 @@ FFFFLAGS='@FFLAGS@'
 FFFLIBS='@FF_LIBS@'
 FFCXX11FLAGS='@CXX11FLAGS@'
 FFLDFLAGS='@LDFLAGS@'
+MPIPROG="@MPIPROG@"
 INCFF=
 if [ "@ENABLE_FFCS@" != "yes" ] ;then ffcs=0; else ffcs=1;fi
 if [ -z "$CXX" ] ; then CXX='@CXX@' ; fi
@@ -149,6 +150,7 @@ while [ $# -ne 0 ]  ; do
 	*.cxx) files="$files '$1'";  o=`basename "$1" .cxx` ; fileso="$fileso '$o.o'"; args=$argsp;;
 	*.c)   files="$files '$1'";  o=`basename "$1" .c` ; fileso="$fileso '$o.o'"; args=$argsp;;
 	*.f)   ffiles="$ffiles '$1'";  o=`basename "$1" .f` ; fileso="$fileso '$o.o'";;
+	*.f90) ffiles="$ffiles '$1'";  o=`basename "$1" .f90` ; fileso="$fileso '$o.o'";;
 	*.F)   ffiles="$ffiles '$1'";  o=`basename "$1" .F` ; fileso="$fileso '$o.o'";;
 	*.o)   fileso="$fileso '$1'"; o=`basename "$1" .o` ;;
 	-o)    out="$2"; shift;;
@@ -200,9 +202,9 @@ if [ -n "$withmpi" ]; then  CXX=$MPICXX;fi
 test "$withmpi" = "yes" && WMPI_LIB="$MPI_LIB"
 
 # build a mpi version of the plugin if the plugin do exist un mpi dir
-# and if the mpi version exist and if
+# and if the mpi version exist "$MPIPROG" and if
 OWMPI=""
-test  -d ../mpi -a -n "$MPI_LIB" -a "$withmpi" != "yes" -a ! -f  "../mpi/$out.cpp"  &&  OWMPI="../mpi/$out.$SUF"
+test  -d ../mpi -a -n "$MPIPROG" -a "$withmpi" != "yes" -a ! -f  "../mpi/$out.cpp"  &&  OWMPI="../mpi/$out.$SUF"
 test -f "$OWMPI" -a -n "$OWMPI" && rm "$OWMPI"
 
 

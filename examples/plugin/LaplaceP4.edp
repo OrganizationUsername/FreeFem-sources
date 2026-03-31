@@ -3,7 +3,7 @@ load "Element_P3"
 load "qf11to25"
 
 mesh Th=square(10,10);
-mesh3 Th3=cube(10,10,10);
+mesh3 Th3=cube(8,8,8);
 verbosity=4;
 
 for (int i=1;i<=26;i++)
@@ -27,6 +27,7 @@ for (int i=1;i<=14;i++)
 verbosity=1;
 
  fespace Vh(Th,P4);     // P1 FE space
+
  Vh uh,vh;              // unkown and test function.
  func f=1;                 //  right hand side function
  func g=0;                 //  boundary condition function
@@ -37,7 +38,7 @@ verbosity=1;
   + on(1,2,3,4,uh=g) ;                      //  boundary condition form
 
   laplace; // solve the problem plot(uh); // to see the result
-  plot(uh,ps="o/LaplaceP4.eps",value=true);
+  plot(uh,ps="o/LaplaceP4.eps",value=true,wait=1);
 
   real[int,int] qq1=[ [0.5,0],
                       [0.5,1]];
@@ -57,3 +58,16 @@ verbosity=1;
   cout << I2 << " == " << I2l << endl;
   assert( abs(I1-I1l) < 1e-10);
   assert( abs(I2-I2l) < 1e-10);
+
+   fespace Vh3(Th3,P4);     // P1 FE space
+
+Vh3 u3,v3;              // unkown and test function.
+
+ solve laplace3(u3,v3) =                    //  Definion of  the problem
+    int3d(Th3,qforder=9)( dx(u3)*dx(v3) + dy(u3)*dy(v3) +  dz(u3)*dz(v3) ) //  bilinear form
+  - int3d(Th3,qforder=9)( v3 )                          //  linear form
+  + on(1,2,3,4,5,6,u3=1) 
+  ;                      //  boundary condition form
+
+plot(u3,wait=1);
+cout << " u3 max "<< u3[].max << " " << u3[].min  << endl; 

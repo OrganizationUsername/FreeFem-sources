@@ -53,11 +53,11 @@ TESTS_HPDDM_ARPACK = diffusion-2d.edp \
 	stokes-io-3d.edp
 
 TESTS_PETSC = bratu-2d-PETSc.edp \
+	coupled-physics-2d-PETSc.md \
 	diffusion-2d-PETSc.edp \
 	diffusion-cartesian-2d-PETSc.edp \
 	diffusion-3d-PETSc.edp \
 	diffusion-periodic-2d-PETSc.edp \
-	diffusion-periodic-balanced-2d-PETSc.edp \
 	elasticity-2d-PETSc.edp \
 	elasticity-3d-PETSc.edp \
 	elasticity-SNES-3d-PETSc.edp \

@@ -201,7 +201,7 @@ struct Op2_padd {
   using second_argument_type = B;
   using result_type          = R*;
   static R * f(Stack s,const A & a,const B & b)  { 
-   R* r= Add2StackOfPtr2Free(s, a || b ? new R ((a ? *a : nullptr) + (b ? *b : nullptr)) : nullptr);
+   R* r= Add2StackOfPtr2Free(s, a || b ? new R ((a ? *a : R()) + (b ? *b : R())) : nullptr);
   // delete a,delete b;
   return r;} }; 
 
@@ -1029,7 +1029,7 @@ struct Op2_sub_pn {
 
 template<class R,class A=R,class B=A,class C=A> 
 struct Op3_p: public ternary_function<A,B,C,R*> { 
-  static R* f(Stack s,const A & a,const B & b,const  C & c )  { return new R(a,b,c);} };   
+  static R* f(Stack,const A & a,const B & b,const  C & c )  { return new R(a,b,c);} };   
 
 template<class R,class A=R,class B=A> 
 struct Op2_p {

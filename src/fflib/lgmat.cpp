@@ -388,10 +388,11 @@ AnyType SetRestrict(Stack stack,Expression einj,Expression erest)
     FESpace * pVFh = **pFVh;
     FESpace & VCh = *pVCh;
     FESpace & VFh = *pVFh;
-    long neC = VCh.NbOfElements   ;
-    long neF = VFh.NbOfElements   ;
-    long ndfC = VCh.NbOfDF   ;
-    long ndfF = VFh.NbOfDF   ;
+    long neC = pVCh ? VCh.NbOfElements : 0;
+    long neF = pVFh ? VFh.NbOfElements : 0;
+    long ndfC = pVCh ? VCh.NbOfDF : 0;
+    long ndfF = pVFh ? VFh.NbOfDF : 0;
+    if (!neC || !neF) neC = neF = ndfC = ndfF = 0;
 
     KN_<long> nc2f= ncf;
     if(INIT==0)
@@ -401,7 +402,7 @@ AnyType SetRestrict(Stack stack,Expression einj,Expression erest)
     inj = -1; // un set ..
     if( verbosity>9) cout<< " ne =" << neC << " " << neF << endl;
 
-    for(int kc=0; kc <VCh.NbOfElements; kc++)
+    for(int kc=0; kc <neC; kc++)
     {
 
         int kf = nc2f(kc);
@@ -1388,7 +1389,7 @@ MatriceMorse<R> *  buildInterpolationMatrix1(const FESpace & Uh,const KN_<double
    for(int ii=0;ii<nbxx;ii++)
    {
      const Triangle *ts=ThU.Find(R2(xx[ii],yy[ii]),Phat,outside);
-     if(outside && !inside) continue;
+     if(outside && inside) continue;// sorry bug wrong not OK if outside and inside 28/04/25 FH and PHT 
      int it = ThU(ts);
      FElement KU(Uh[it]);
      KNMK_<R> fb(v,nbdfUK,NUh,last_operatortype);
@@ -1467,7 +1468,7 @@ MatriceMorse<R> *  buildInterpolationMatrixT1(const FESpaceT & Uh,const KN_<doub
   for(int ii=0;ii<nbxx;ii++){
       if(verbosity>9) cout << " Find ThU " <<ii << ":" <<  RdT(xx[ii],yy[ii],zz[ii]) << endl;
     const ElementT *ts=ThU.Find(RdT(xx[ii],yy[ii],zz[ii]),Phat,outside);
-    if(outside && !inside) continue;
+    if(outside && inside) continue;//  sorry bug wrong not OK if outside and inside 28/04/25 FH and PHT
     int it = ThU(ts);
     FElementT KU(Uh[it]);
     KNMK_<R> fb(v,nbdfUK,NUh,last_operatortype);
@@ -1505,7 +1506,7 @@ AnyType SetMatrixInterpolation1(Stack stack,Expression emat,Expression einter,in
   ffassert(einter);
   pfes * pUh = GetAny< pfes * >((* mi->a)(stack));
   FESpace * Uh = **pUh;
-  int NUh =Uh->N;
+  int NUh =Uh ? Uh->N : 0;
   int* data = new int[4 + NUh];
   data[0]=mi->arg(0,stack,false); // transpose not
   data[1]=mi->arg(1,stack,(long) op_id); ; // get just value
@@ -1515,32 +1516,41 @@ AnyType SetMatrixInterpolation1(Stack stack,Expression emat,Expression einter,in
   U2Vc= mi->arg(4,stack,U2Vc); ;
   if( mi->c==0)
   { // old cas
-  pfes * pVh = GetAny<  pfes * >((* mi->b)(stack));
-  FESpace * Vh = **pVh;
-  int NVh =Vh->N;
+    pfes * pVh = GetAny<  pfes * >((* mi->b)(stack));
+    FESpace * Vh = **pVh;
+    if (Vh && Uh) {
+      int NVh =Vh->N;
 
-      for(int i=0;i<NUh;++i)
-        data[4+i]=i;//
-      for(int i=0;i<min(NUh,(int) U2Vc.size());++i)
-	  data[4+i]= U2Vc[i];//
-  if(verbosity>3)
-	for(int i=0;i<NUh;++i)
-	  {
-	    cout << "The Uh componante " << i << " -> " << data[4+i] << "  Componante of Vh  " <<endl;
-	  }
-	  for(int i=0;i<NUh;++i)
-	if(data[4+i]>=NVh)
-	  {
-	      cout << "The Uh componante " << i << " -> " << data[4+i] << " >= " << NVh << " number of Vh Componante " <<endl;
-	      ExecError("Interpolation incompability between componante ");
-	  }
+          for(int i=0;i<NUh;++i)
+            data[4+i]=i;//
+          for(int i=0;i<min(NUh,(int) U2Vc.size());++i)
+	      data[4+i]= U2Vc[i];//
+      if(verbosity>3)
+	    for(int i=0;i<NUh;++i)
+	      {
+	        cout << "The Uh componante " << i << " -> " << data[4+i] << "  Componante of Vh  " <<endl;
+	      }
+	      for(int i=0;i<NUh;++i)
+	    if(data[4+i]>=NVh)
+	      {
+	          cout << "The Uh componante " << i << " -> " << data[4+i] << " >= " << NVh << " number of Vh Componante " <<endl;
+	          ExecError("Interpolation incompability between componante ");
+	      }
 
-  ffassert(Vh);
-  ffassert(Uh);
+      ffassert(Vh);
+      ffassert(Uh);
 
-  if(!init) sparse_mat->init();
-      sparse_mat->typemat=0; //TypeSolveMat(TypeSolveMat::NONESQUARE); //  none square matrice (morse)
-  sparse_mat->A.master(buildInterpolationMatrix(*Uh,*Vh,data));
+      if(!init) sparse_mat->init();
+          sparse_mat->typemat=0; //TypeSolveMat(TypeSolveMat::NONESQUARE); //  none square matrice (morse)
+      sparse_mat->A.master(buildInterpolationMatrix(*Uh,*Vh,data));
+    } else {
+      int n = Uh ? Uh->NbOfDF : 0;
+      int m = Vh ? Vh->NbOfDF : 0;
+      HashMatrix<int,R> *phm= new HashMatrix<int,R>(n,m,0,0);
+      MatriceCreuse<R> *pmc(phm);
+      sparse_mat->typemat=0;
+      sparse_mat->A.master(pmc);
+    }
   }
   else
   {  // new cas mars 2006
@@ -1569,8 +1579,10 @@ AnyType SetMatrixInterpolationT1(Stack stack,Expression emat,Expression einter,i
   ffassert(einter);
   pfesT1 * pUh = GetAny< pfesT1 * >((* mi->a)(stack));
   FESpaceT1 * Uh = **pUh;
+  int n = 0, m = 0;
   if(Uh) {
     int NUh =Uh->N;
+    n = Uh->NbOfDF;
     int* data = new int[4 + NUh];
     data[0]=mi->arg(0,stack,false); // transpose not
     data[1]=mi->arg(1,stack,(long) op_id); ; // get just value
@@ -1584,6 +1596,7 @@ AnyType SetMatrixInterpolationT1(Stack stack,Expression emat,Expression einter,i
       FESpaceT2 * Vh = **pVh;
       if(Vh) {
         int NVh =Vh->N;
+        m = Vh->NbOfDF;
         for(int i=0;i<NUh;++i)
         data[4+i]=i;//
         for(int i=0;i<min(NUh,(int) U2Vc.size());++i)
@@ -1617,6 +1630,16 @@ AnyType SetMatrixInterpolationT1(Stack stack,Expression emat,Expression einter,i
       sparse_mat->A.master(buildInterpolationMatrixT1<FESpaceT1>(*Uh,xx,yy,zz,data));
     }
     delete [] data;
+  } else {
+      pfesT2 * pVh = GetAny<  pfesT2 * >((* mi->b)(stack));
+      FESpaceT2 * Vh = **pVh;
+      if(Vh) m = Vh->NbOfDF;
+  }
+  if ((m == 0 || n == 0) && m != n) {
+    HashMatrix<int,R> *phm= new HashMatrix<int,R>(n,m,0,0);
+    MatriceCreuse<R> *pmc(phm);
+    sparse_mat->typemat=0;
+    sparse_mat->A.master(pmc);
   }
   return sparse_mat;
 }
@@ -2590,7 +2613,7 @@ template<typename R>  BlockMatrix<R>::BlockMatrix(const basicAC_F0 & args,int ii
 		    t_Mij[i][j]=0;
 		}
 		else if ( atype<R >()->CastingFrom(rij) )
-		{  		  // frev 2007
+		{  		  // fevr 2007
 		    e_Mij[i][j]=to<R>(c_Mij);
 		    t_Mij[i][j]=7; //  just un scalaire
 		}
@@ -2777,17 +2800,20 @@ template<typename R>  AnyType BlockMatrix<R>::operator()(Stack s) const
 
    cnjij = false;
    KN<long> Oi(N+1), Oj(M+1);
+    KN<bool> Zi(N,false), Zj(M,false);
+
    if(verbosity>9) { cout << " Build Block Matrix : " << N << " x " << M << endl;}
    Bij = (L) 0;
    Oi = (long) 0;
    Oj = (long)0;
+
   for (int i=0;i<N;++i)
    for (int j=0;j<M;++j)
     {
       Fij(i,j)=0;
       Expression eij = e_Mij[i][j];
       int tij=t_Mij[i][j];
-      if (eij)
+      if (eij) // warning eij == 0 is O case.
       {
         cnjij(i,j) = tij%2 == 0;
         AnyType e=(*eij)(s);
@@ -2804,6 +2830,7 @@ template<typename R>  AnyType BlockMatrix<R>::operator()(Stack s) const
          ExecError(" Type sub matrix block unknown ");
         }
       }
+      else ffassert(tij==0);
      }
      //  compute size of matrix
      int err=0;
@@ -2816,7 +2843,8 @@ template<typename R>  AnyType BlockMatrix<R>::operator()(Stack s) const
          nm = get_NM( *Bij(i,j));
        else if(Fij(i,j))
          nm = make_pair<long,long>(Fij(i,j)->N(), Fij(i,j)->M());
-
+       else
+           Zi(i)=Zj(j)=true;
         if (( nm.first || nm.second)  && verbosity>3)
           cout << " Block [ " << i << "," << j << " ]      =     " << nm.first << " x " << nm.second << " cnj = " << cnjij(i,j) << endl;
         if (nm.first)
@@ -2843,21 +2871,19 @@ template<typename R>  AnyType BlockMatrix<R>::operator()(Stack s) const
 
     if (err)    ExecError("Error Block Matrix,  size sub matrix");
     //  gestion of zero block ????
-
+/*  remove for block of size 0  june 13 2025 PHT and FH */
     for (int j=0;j<M;++j)
     {  if(verbosity>99) cout << j << " column size" << Oj(j+1) << endl;
-        if   ( Oj(j+1) ==0) {
+        if   ( Oj(j+1) ==0 && Zj(j))
             Oj(j+1)=1;
-            if( Oj(j+1) !=1)  err++;}
+           
     }
     for (int i=0;i<N;++i)
     {
         if(verbosity>99) cout << i << " row size" << Oi(i+1) << endl;
-        if   ( Oi(i+1) ==0) {
+        if   ( Oi(i+1) ==0 && Zi(i))
                Oi(i+1)=1;
-               if( Oi(i+1) !=1)  err++;}
     }
-    if (err)    ExecError("Error Block Matrix with  0 line or  0 colomn..");
 
     for (int i=0;i<N;++i)
       Oi(i+1) += Oi(i);
@@ -2880,10 +2906,10 @@ template<typename R>  AnyType BlockMatrix<R>::operator()(Stack s) const
              cout << "  Add  Block S " << i << "," << j << " =  at " << Oi(i) << " x " << Oj(j) << " conj = " << cnjij(i,j) << endl;
              HashMatrix<int,R> & mmij=*Aij;
              const list<tuple<R,MatriceCreuse<R>*,bool> >  &lM=*Bij(i,j);
-             bool ttrans=false;
+             bool ttrans=false; // transpose flag already in lM
              int ii00=Oi(i);
              int jj00=Oj(j);
-             bool cnj=cnjij(i,j);
+             bool cnj=false; // transpose flag already in lM
             BuildCombMat(mmij,lM,ttrans,ii00,jj00,cnj);
 
 
@@ -3924,24 +3950,17 @@ void  init_lgmat()
   Global.Add("interpolate","(",new MatrixInterpolation<pfesS,pfesS>(1,1));
   Global.Add("interpolate","(",new MatrixInterpolation<pfesL,pfesL>);
   Global.Add("interpolate","(",new MatrixInterpolation<pfesL,pfesL>(1,1));
-    
+    // warning  the case MatrixInterpolation<fe1,fe2> (1,1) not use fe2 ..
+    // so remove case (1,1) to remove  ambiguity Polymorphic Find 4
   Global.Add("interpolate","(",new MatrixInterpolation<pfesS,pfes3>);
-  Global.Add("interpolate","(",new MatrixInterpolation<pfesS,pfes3>(1,1));
   Global.Add("interpolate","(",new MatrixInterpolation<pfesL,pfes>);
-  Global.Add("interpolate","(",new MatrixInterpolation<pfesL,pfes>(1,1));
   Global.Add("interpolate","(",new MatrixInterpolation<pfesL,pfesS>);
-  Global.Add("interpolate","(",new MatrixInterpolation<pfesL,pfesS>(1,1));
   Global.Add("interpolate","(",new MatrixInterpolation<pfesS,pfesL>);
-  Global.Add("interpolate","(",new MatrixInterpolation<pfesS,pfesL>(1,1));
   Global.Add("interpolate","(",new MatrixInterpolation<pfesS,pfes>);
-  Global.Add("interpolate","(",new MatrixInterpolation<pfesL,pfes>(1,1));
   
   Global.Add("interpolate","(",new MatrixInterpolation<pfes,pfesL>);
-  Global.Add("interpolate","(",new MatrixInterpolation<pfes,pfesL>(1,1));
   Global.Add("interpolate","(",new MatrixInterpolation<pfes,pfesS>);
-  Global.Add("interpolate","(",new MatrixInterpolation<pfes,pfesS>(1,1));
   Global.Add("interpolate","(",new MatrixInterpolation<pfes,pfes3>);
-  Global.Add("interpolate","(",new MatrixInterpolation<pfes,pfes3>(1,1));
     
   Global.Add("interplotematrix","(",new  OneOperatorCode<PrintErrorCompileIM>);
   zzzfff->Add("mapmatrix",atype<map< pair<int,int>, double> *>());

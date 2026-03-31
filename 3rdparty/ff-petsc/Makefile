@@ -35,7 +35,14 @@ DARWIN=$(shell uname | grep Darwin 2> /dev/null)
 
 W_SUDO:=$(SHELL mkdir -p "$(DESTDIR)$(FF_prefix_petsc)" && test -w "$(DESTDIR)$(FF_prefix_petsc) || echo sudo)
 ifeq ($(COMPILE_OPENBLAS),openblas)
+ifeq ($(FC),)
 PETSC_OPENBLAS := --download-f2cblaslapack
+else
+PETSC_OPENBLAS := --download-openblas
+ifeq ($(FF_generic_petsc), yes)
+PETSC_OPENBLAS += --download-openblas-make-options=TARGET=GENERIC
+endif
+endif
 PETSC_OPENBLAS_C := --with-blaslapack-dir=$(DIR_INSTALL_REAL)
 else
 PETSC_OPENBLAS = --with-blaslapack-include='$(shell echo $(BLASINC) | sed "s/-I//g")' \
@@ -47,10 +54,12 @@ PETSC_DOWNLOAD_C := --with-metis-dir=$(DIR_INSTALL_REAL) \
 		--with-superlu-dir=$(DIR_INSTALL_REAL) \
 		--with-suitesparse-dir=$(DIR_INSTALL_REAL) \
 		--with-parmetis-dir=$(DIR_INSTALL_REAL) \
-		--with-tetgen-dir=$(DIR_INSTALL_REAL)
+		--with-tetgen-dir=$(DIR_INSTALL_REAL) \
+		--with-gsl-dir=$(DIR_INSTALL_REAL)
 PETSC_DOWNLOAD := --download-metis --download-ptscotch \
 		--download-hypre --download-parmetis \
-		--download-superlu --download-suitesparse --download-tetgen
+		--download-superlu --download-suitesparse --download-tetgen \
+		--download-gsl=https://mirrors.kernel.org/gnu/gsl/gsl-2.8.tar.gz
 ifneq ($(TOOL_DYLIB_mmg),)
 PETSC_DOWNLOAD += --download-mmg
 PETSC_DOWNLOAD_C += --with-mmg-dir=$(DIR_INSTALL_REAL)
@@ -62,16 +71,22 @@ endif
 ifeq ($(FFCMAKE),no)
 PETSC_DOWNLOAD := $(PETSC_DOWNLOAD) --download-cmake
 endif
-PETSC_DOWNLOAD_C := $(PETSC_DOWNLOAD_C) --download-htool --download-htool-commit=fe5e690b6e6fa1ca64f76bc1d0c602e07ed9715a
-ifeq ($(FF_generic_petsc), yes)
-FLAGS_MTUNE := -mtune=generic
-endif
+PETSC_DOWNLOAD_C := $(PETSC_DOWNLOAD_C) --download-htool
 unexport MAKEFLAGS
-COMMON_FLAGS := --with-debugging=0 COPTFLAGS='-O3 $(FLAGS_MTUNE)' CXXOPTFLAGS='-O3 $(FLAGS_MTUNE)' FOPTFLAGS='-O3 $(FLAGS_MTUNE)' --with-ssl=0 --with-x=0 --with-fortran-bindings=0 --with-cudac=0 --with-tau-perfstubs=0 \
+COMMON_FLAGS := --with-debugging=0 FOPTFLAGS=-O --with-ssl=0 --with-x=0 --with-fortran-bindings=0 --with-hg=0 --with-c2html=0 --with-coverage=0 --with-syclc=0 --with-hipc=0 --with-cudac=0 --with-tau-perfstubs=0 --with-python=0 \
 		--download-slepc --download-hpddm
 
 ifneq ($(wildcard ~/.petsc_pkg),)
 COMMON_FLAGS += --with-packages-download-dir=~/.petsc_pkg
+endif
+
+ifeq ($(FF_generic_petsc), yes)
+COMMON_FLAGS += COPTFLAGS=-O2 CXXOPTFLAGS=-O2 --with-avx512-kernels=0 FFLAGS+='-mtune=generic'
+ifeq ($(WIN32DLLTARGET),)
+COMMON_FLAGS += CFLAGS+='-mtune=generic' CXXFLAGS+='-mtune=generic'
+endif
+else
+COMMON_FLAGS += COPTFLAGS=-O3 CXXOPTFLAGS=-O3
 endif
 
 ifeq ($(FC),)
@@ -85,7 +100,7 @@ ifeq ($(WIN32DLLTARGET),)
 PETSC_DOWNLOAD += --with-cc='$(CC)' --with-cxx='$(CXX)' --download-mpich
 PETSC_DOWNLOAD_C += --with-mpi-dir=$(DIR_INSTALL_REAL)
 ifeq ($(DARWIN),Darwin)
-PETSC_DOWNLOAD += --download-mpich-device=ch4:ofi 'LDFLAGS=-Wl,-ld_classic -Wl,-commons,use_dylibs'
+PETSC_DOWNLOAD += --download-mpich-device=ch4:ofi
 endif
 ifneq ($(FC),)
 PETSC_DOWNLOAD += --with-fc='$(FC)'
@@ -99,6 +114,7 @@ endif
 endif
 
 ifeq ($(WIN32DLLTARGET),)
+PETSC_DOWNLOAD += --download-bison=https://mirrors.kernel.org/gnu/bison/bison-3.8.2.tar.gz
 ifneq ($(FC),)
 ifneq ($(wildcard ~/.petsc_pkg),)
 PETSC_DOWNLOAD += --download-slepc-configure-arguments="--download-arpack --with-packages-download-dir=~/.petsc_pkg"
@@ -119,11 +135,12 @@ endif
 endif
 
 ifneq ($(WIN32DLLTARGET),)
-COMMON_FLAGS += --with-shared-libraries=0 \
-	CXXFLAGS='-fno-stack-protector -Wno-stringop-overflow' \
-	CFLAGS='-fno-stack-protector -Wno-stringop-overflow' \
-	FFLAGS='$(FCFLAGS)' \
-	--with-mpiexec='/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec'
+COMMON_FLAGS += --with-shared-libraries=0 --with-mpiexec='/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec'
+PETSC_CXXFLAGS := -fno-stack-protector -Wno-format -Wno-format-extra-args
+ifeq ($(FF_generic_petsc), yes)
+PETSC_CXXFLAGS += -mtune=generic
+endif
+COMMON_FLAGS += CFLAGS+='$(PETSC_CXXFLAGS) -Wno-maybe-uninitialized' CXXFLAGS+='$(PETSC_CXXFLAGS)'
 ifneq ($(FC),)
 ifneq ($(wildcard ~/.petsc_pkg),)
 PETSC_DOWNLOAD += '--download-slepc-configure-arguments=--with-packages-build-dir=$(PETSC_DIR)/fr/externalpackages --download-arpack --with-packages-download-dir=~/.petsc_pkg'
@@ -193,7 +210,7 @@ PETSc-complex:
 WHERE:../lib/WHERE.PETSc ../lib/WHERE.SLEPc
 
 ../lib/WHERE.PETSc:$(SRCDIR)/tag-install-real
-	-mkdir ../lib
+	-mkdir ../lib 2>/dev/null
 	echo 'petsc LD -Wl,-rpath,"$(DIR_INSTALL_REAL)/lib" -L"$(DIR_INSTALL_REAL)/lib" -lpetsc' > $@
 	echo 'petsc INCLUDE -I"$(DIR_INSTALL_REAL)/include"' >> $@
 
@@ -204,7 +221,7 @@ $(SRCDIR)/tag-make-real:$(SRCDIR)/tag-conf-real
 
 $(SRCDIR)/tag-install-real :$(SRCDIR)/tag-make-real
 	cd $(SRCDIR) && $(MAKE) PETSC_DIR=$(PETSC_DIR) PETSC_ARCH=fr install-lib
-	-cd $(SRCDIR) && export HWLOC_HIDE_ERRORS=2 && $(MAKE) PETSC_DIR=$(DIR_INSTALL_REAL) SLEPC_DIR=$(DIR_INSTALL_REAL) PETSC_ARCH="" check
+	-cd $(SRCDIR) && export HWLOC_HIDE_ERRORS=2 OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 && $(MAKE) PETSC_DIR=$(DIR_INSTALL_REAL) SLEPC_DIR=$(DIR_INSTALL_REAL) PETSC_ARCH="" check
 	test -e $(DIR_INSTALL_REAL)/include/petsc.h
 	test -e $(DIR_INSTALL_REAL)/lib/petsc/conf/petscvariables
 	touch $@
@@ -242,16 +259,15 @@ WHERE-complex:../lib/WHERE.PETSc-complex ../lib/WHERE.SLEPc-complex
 
 ../lib/WHERE.PETSc-complex:$(SRCDIR)/tag-install-complex
 	test -e $(DIR_INSTALL_COMPLEX)/include/petsc.h
-	-mkdir ../lib
+	-mkdir ../lib 2>/dev/null
 	echo 'petsccomplex LD -Wl,-rpath,"$(DIR_INSTALL_COMPLEX)/lib" -L"$(DIR_INSTALL_COMPLEX)/lib" -lpetsc' > $@
 	echo 'petsccomplex INCLUDE -I"$(DIR_INSTALL_COMPLEX)/include"' >> $@
-	echo done $@
+
 ../lib/WHERE.SLEPc-complex:
 	test -e $(DIR_INSTALL_COMPLEX)/include/slepc.h
-	-mkdir ../lib
+	-mkdir ../lib 2>/dev/null
 	echo 'slepccomplex LD -Wl,-rpath,"$(DIR_INSTALL_COMPLEX)/lib" -L"$(DIR_INSTALL_COMPLEX)/lib" -lslepc' > $@
 	echo 'slepccomplex INCLUDE -I"$(DIR_INSTALL_COMPLEX)/include"' >> $@
-	echo done $@
 
 WHERE-all:Makefile WHERE WHERE-complex
 	echo >$@
@@ -305,7 +321,7 @@ $(PACKAGE):
 	../getall -o PETSc -a
 
 ../lib/WHERE.SLEPc:
-	-mkdir ../lib
+	-mkdir ../lib 2>/dev/null
 	test -e $(DIR_INSTALL_REAL)/include/slepc.h
 	echo 'slepc LD -Wl,-rpath,"$(DIR_INSTALL_REAL)/lib" -L"$(DIR_INSTALL_REAL)/lib" -lslepc' > $@
 	echo 'slepc INCLUDE -I"$(DIR_INSTALL_REAL)/include"' >> $@

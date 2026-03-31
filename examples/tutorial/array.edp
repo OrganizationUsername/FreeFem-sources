@@ -481,3 +481,27 @@ cout << vh.n <<endl;
 	
 
 }
+{// Sep 2025  verif new formal operator 
+func cId =
+       [ [1.i,0.],
+        [0.,1.i]];
+func Z =
+       [ [0,0.],
+        [0.,0]];
+
+complex[int,int] I0 =-cId';
+complex[int,int] I1 =cId-cId';
+complex[int,int] I2 = cId-cId;
+complex[int,int] I3 = cId+cId;
+
+// verif
+
+cout << I0.sum << " "<< I0 << endl  
+    << I1.sum << " "<< I1 << endl 
+    << I2.sum << " "<<I2 << endl 
+    << I3.sum<< " "<< I3<< endl;
+assert(I0.sum== 2i);
+assert(I1.sum==4i);
+assert(I2.sum==0);
+assert(I3.sum==4i);
+}

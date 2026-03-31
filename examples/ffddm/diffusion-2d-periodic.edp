@@ -1,0 +1,43 @@
+// NBPROC 4
+// PARAM -global 20
+
+macro Mperiodic()[[1,x],[3,x],[2,y],[4,y]]//
+macro Pk()P2,periodic=Mperiodic //
+
+macro dimension 2// EOM            // 2D or 3D
+
+include "ffddm.idp"
+
+macro def(i)i// EOM                         // scalar field definition
+macro init(i)i// EOM                        // scalar field initialization
+
+int global = getARGV("-global", 100);
+
+mesh ThGlobal = square(global,global,[2*x*pi,2*y*pi]);
+
+ffddmbuildDmesh(M,ThGlobal,mpiCommWorld)
+
+ffddmbuildDfespace(FE, M, real, def, init, Pk)
+
+func f=sin(x+pi/4.)*cos(y+pi/4.);
+
+macro Grad(u) [dx(u),dy(u)] // EOM
+
+macro Varf(varfName, meshName, PhName)
+    varf varfName(u,v) =
+  int2d(meshName)(Grad(u)'*Grad(v)) + int2d(meshName)(f*v); // EOM
+
+ffddmsetup(H,FE,Varf,null)
+
+real[int] rhs(1);
+
+ffddmbuildrhs(H,Varf,rhs)
+
+real[int] x0(rhs.n);
+x0 = 0;
+
+FEVhi def(u);
+
+u[] = HfGMRES(x0, rhs, 1.e-6, 200, "right");
+
+ffddmplot(FE,u, "Global solution");

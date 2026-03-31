@@ -413,7 +413,7 @@ struct SMesh {
   R = -1.;    //
   // 1 recher de min local
   rs = 1;
-  // voisanage de sommet
+  // voisinage de sommet
   KN< long > head(nbv), next(3 * nbt);
   head = -1;
 
@@ -423,7 +423,7 @@ struct SMesh {
     head[j] = p;
   }
 
-  KN< int > nbrv(nbv);    // nb traingle around  vertices
+  KN< int > nbrv(nbv);    // nb triangle around  vertices
   nbrv = 0;
 
   for (int k = 0; k < nbt; ++k) {

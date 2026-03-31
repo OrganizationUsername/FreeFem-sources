@@ -1,4 +1,9 @@
-#include "petsc.h"
+#include <petsc.h>
+
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wunused-value"
+#endif
 
 #include "PETSc.hpp"
 #include "compositeFESpace.hpp"
@@ -29,7 +34,7 @@ struct HtoolCtx {
 };
 
 template<typename P, typename MeshBemtool>
-static PetscErrorCode GenEntriesFromCtx(PetscInt sdim,PetscInt M,PetscInt N, const PetscInt *const J, const PetscInt *const K, PetscScalar* ptr,void *ctx) {
+static PetscErrorCode GenEntriesFromCtx(PetscInt,PetscInt M,PetscInt N, const PetscInt *const J, const PetscInt *const K, PetscScalar* ptr,void *ctx) {
     PetscFunctionBeginUser;
     HtoolCtx<P,MeshBemtool>* user = reinterpret_cast<HtoolCtx<P,MeshBemtool>*>(ctx);
     user->generator->copy_submatrix(M,N,J,K,ptr);
@@ -37,8 +42,13 @@ static PetscErrorCode GenEntriesFromCtx(PetscInt sdim,PetscInt M,PetscInt N, con
 }
 
 template<typename P, typename MeshBemtool>
+#if PETSC_VERSION_GE(3, 23, 0)
+static PetscErrorCode DestroyHtoolCtx(void **ctx) {
+    HtoolCtx<P,MeshBemtool>* user = (HtoolCtx<P,MeshBemtool>*)*ctx;
+#else
 static PetscErrorCode DestroyHtoolCtx(void *ctx) {
     HtoolCtx<P,MeshBemtool>* user = (HtoolCtx<P,MeshBemtool>*)ctx;
+#endif
 
     PetscFunctionBeginUser;
     delete user;
@@ -56,7 +66,7 @@ htool::VirtualGenerator<PetscScalar>* get_gen(Gen<P, MeshBemtool>* generator) {
 }
 
 template<class Matrix, template<typename P, typename MeshBemtool> class Gen, typename P, typename MeshBemtool, class R = PetscScalar, typename std::enable_if< std::is_same< Matrix, Dmat >::value >::type* = nullptr>
-void Assembly(Matrix* A, Gen<P, MeshBemtool>* generator, string compressor,vector<double> &p1,vector<double> &p2,MPI_Comm comm,int dim,bool sym = false) {
+void Assembly(Matrix* A, Gen<P, MeshBemtool>* generator, string compressor,vector<double> &p1,vector<double> &p2,MPI_Comm,int,bool sym = false) {
     PetscInt m, M;
     KSPDestroy(&A->_ksp);
     if(A->_vS) {
@@ -94,7 +104,7 @@ void Assembly(Matrix* A, Gen<P, MeshBemtool>* generator, string compressor,vecto
 }
 
 template<class fes1, class fes2, typename std::enable_if< (fes1::FESpace::Mesh::RdHat::d >= 3) || std::is_same<typename fes1::FESpace::Mesh, Mesh>::value >::type* = nullptr >
-void varfBem(const typename fes1::FESpace*& PUh, const typename fes2::FESpace*& PVh, bool same, int VFBEM, Stack stack, const list<C_F0>& bargs, const Data_Sparse_Solver& ds, Dmat* B) {
+void varfBem(const typename fes1::FESpace*&, const typename fes2::FESpace*&, bool, int VFBEM, Stack, const list<C_F0>&, const Data_Sparse_Solver&, Dmat*) {
     ffassert(VFBEM == -1);
 }
 
@@ -146,7 +156,13 @@ void dispatch(MeshBemtool *mesh, bemtool::Geometry *node, int VFBEM, Stack stack
         Assembly(B,ctx,ds.sparams,p1,p1,MPI_COMM_NULL,Mesh1::RdHat::d+1,ds.sym);
         PetscContainerCreate(PetscObjectComm((PetscObject)B->_petsc), &ptr);
         PetscContainerSetPointer(ptr, ctx);
+#if PETSC_VERSION_GE(3, 24, 0)
+        PetscContainerSetCtxDestroy(ptr, (PetscCtxDestroyFn *)DestroyHtoolCtx<P,MeshBemtool>);
+#elif PETSC_VERSION_GE(3, 23, 0)
+        PetscContainerSetCtxDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
+#else
         PetscContainerSetUserDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
+#endif
         PetscObjectCompose((PetscObject)B->_petsc, "HtoolCtx", (PetscObject)ptr);
     }
     else {
@@ -193,7 +209,13 @@ void dispatch(MeshBemtool *mesh, bemtool::Geometry *node, int VFBEM, Stack stack
         Assembly(B,ctx,ds.sparams,p1,p1,MPI_COMM_NULL,Mesh1::RdHat::d+1,ds.sym);
         PetscContainerCreate(PetscObjectComm((PetscObject)B->_petsc), &ptr);
         PetscContainerSetPointer(ptr, ctx);
+#if PETSC_VERSION_GE(3, 24, 0)
+        PetscContainerSetCtxDestroy(ptr, (PetscCtxDestroyFn *)DestroyHtoolCtx<P,MeshBemtool>);
+#elif PETSC_VERSION_GE(3, 23, 0)
+        PetscContainerSetCtxDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
+#else
         PetscContainerSetUserDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
+#endif
         PetscObjectCompose((PetscObject)B->_petsc, "HtoolCtx", (PetscObject)ptr);
     }
     else {
@@ -206,11 +228,9 @@ template<class fes1, class fes2, typename std::enable_if< (fes1::FESpace::Mesh::
 void varfBem(const typename fes1::FESpace*& PUh, const typename fes2::FESpace*& PVh, bool same, int VFBEM, Stack stack, const list<C_F0>& bargs, const Data_Sparse_Solver& ds, Dmat* B) {
     if (VFBEM == 1)
         ffassert(same);
-    typedef typename fes1::pfes pfes1;
     typedef typename fes1::FESpace FESpace1;
     typedef typename FESpace1::Mesh Mesh1;
 
-    typedef typename fes2::pfes pfes2;
     typedef typename fes2::FESpace FESpace2;
     typedef typename FESpace2::Mesh Mesh2;
 
@@ -347,7 +367,7 @@ namespace PETSc {
       AnyType operator()(Stack s) const;
 
       Op(Expression x, Expression y) : b(new Call_FormBilinear<fes1, fes2>(*dynamic_cast<const Call_FormBilinear<fes1, fes2>*>(y))), a(x) {
-          assert(b && b->nargs);
+          ffassert(b && b->nargs);
           ffassert(FieldOfForm(b->largs, IsComplexType<upscaled_type<K>>::value) == IsComplexType<upscaled_type<K>>::value);
 
           #if defined(WITH_bemtool) && defined(WITH_htool) && defined(PETSC_HAVE_HTOOL)
@@ -367,18 +387,16 @@ namespace PETSc {
     ffassert(pUh == pVh);
   }
   template<class fes1, class fes2, typename std::enable_if< !std::is_same< fes1, fes2 >::value >::type* = nullptr >
-  void assert_ptr(fes1* pUh, fes2* pVh) { }
+  void assert_ptr(fes1*, fes2*) { }
   template<class K, class MMesh, class fes1, class fes2>
   AnyType varfToMat<K, MMesh, fes1, fes2>::Op::operator()(Stack stack) const {
     typedef typename fes1::pfes pfes1;
     typedef typename fes1::FESpace FESpace1;
-    typedef typename FESpace1::Mesh Mesh1;
 
     typedef typename fes2::pfes pfes2;
     typedef typename fes2::FESpace FESpace2;
-    typedef typename FESpace2::Mesh Mesh2;
 
-    assert(b && b->nargs);
+    ffassert(b && b->nargs);
     pfes1* pUh = GetAny<pfes1*>((*b->euh)(stack));
     pfes2* pVh = GetAny<pfes2*>((*b->evh)(stack));
     const FESpace1* PUh = (FESpace1*)**pUh;
@@ -393,42 +411,44 @@ namespace PETSc {
     WhereStackOfPtr2Free(stack) = new StackOfPtr2Free(stack);
 
     Dmat& B(*GetAny<Dmat*>((*a)(stack)));
-    if(!PUh || !PVh)
-      return SetAny<Dmat*>(&B);
     const FESpace1& Uh = *PUh;
     const FESpace2& Vh = *PVh;
-    const Mesh1& Th = Uh.Th;
-    bool same = isSameMesh(b->largs, &Uh.Th, &Vh.Th, stack);
+    bool same = isSameMesh(b->largs, PUh ? &Uh.Th : nullptr, PVh ? &Vh.Th : nullptr, stack);
 #if defined(WITH_bemtool) && defined(WITH_htool) && defined(PETSC_HAVE_HTOOL)
     int VFBEM = typeVFBEM(b->largs, stack);
 #else
     int VFBEM = -1;
 #endif
     if (VFBEM == -1) {
-      ffassert((std::is_same< fes1, fes2 >::value));
       Matrice_Creuse<upscaled_type<K>> A;
       A.init();
       if(same) {
-        if(A.Uh != Uh || A.Vh != Vh) {
-          A.Uh = Uh;
-          A.Vh = Vh;
-          if(ds.sym) {
-            A.A.master(new MatriceMorse<upscaled_type<K>>(Vh.NbOfDF, Vh.NbOfDF, 0, ds.sym));
-            assert_ptr(&Uh, &Vh);
+        if(PUh && PVh) {
+          if(A.Uh != Uh || A.Vh != Vh) {
+            A.Uh = Uh;
+            A.Vh = Vh;
+            if(ds.sym) {
+              A.A.master(new MatriceMorse<upscaled_type<K>>(Vh.NbOfDF, Vh.NbOfDF, 0, ds.sym));
+              assert_ptr(&Uh, &Vh);
+            }
+            else
+              A.A.master(new MatriceMorse<upscaled_type<K>>(Vh.NbOfDF, Uh.NbOfDF, 2 * Vh.NbOfDF, 0));
           }
-          else
-            A.A.master(new MatriceMorse<upscaled_type<K>>(Vh.NbOfDF, Uh.NbOfDF, 2 * Vh.NbOfDF, 0));
-        }
-        if(AssembleVarForm<upscaled_type<K>, MatriceCreuse<upscaled_type<K>>, MMesh, FESpace1,FESpace2>(stack, Th, Uh, Vh, ds.sym, A.A, 0, b->largs))
-          AssembleBC<upscaled_type<K>, MMesh,FESpace1, FESpace2>(stack, Th, Uh, Vh, ds.sym, A.A, 0, 0, b->largs, ds.tgv);
+          if(AssembleVarForm<upscaled_type<K>, MatriceCreuse<upscaled_type<K>>, MMesh, FESpace1,FESpace2>(stack, *((MMesh*)&PUh->Th), Uh, Vh, ds.sym, A.A, nullptr, b->largs))
+            AssembleBC<upscaled_type<K>, MMesh,FESpace1, FESpace2>(stack, *((MMesh*)&PUh->Th), Uh, Vh, ds.sym, A.A, nullptr, nullptr, b->largs, ds.tgv);
+          }
+        else
+          A.A.master(new MatriceMorse<upscaled_type<K>>(PVh ? Vh.NbOfDF : 0, PUh ? Uh.NbOfDF : 0, 0, 0));
       }
       else {
-        MatriceMorse<upscaled_type<K>> *pMA = new MatriceMorse<upscaled_type<K>>(Vh.NbOfDF, Uh.NbOfDF, 0, ds.sym);
+        MatriceMorse<upscaled_type<K>> *pMA = new MatriceMorse<upscaled_type<K>>(PVh ? Vh.NbOfDF : 0, PUh ? Uh.NbOfDF : 0, 0, ds.sym);
         MatriceMap<upscaled_type<K>>& D = *pMA;
-        bool bc = AssembleVarForm<upscaled_type<K>, MatriceMap<upscaled_type<K>>, MMesh, FESpace1,FESpace2>(stack, Th, Uh, Vh, ds.sym, &D, 0, b->largs);
+        bool bc = false;
+        if (PUh && PVh)
+          bc = AssembleVarForm<upscaled_type<K>, MatriceMap<upscaled_type<K>>, MMesh, FESpace1,FESpace2>(stack, *((MMesh*)&PUh->Th), Uh, Vh, ds.sym, &D, nullptr, b->largs);
         A.A.master(pMA);
         if(bc)
-          AssembleBC<upscaled_type<K>>(stack, Th, Uh, Vh, ds.sym, A.A, 0, 0, b->largs, ds.tgv);
+          AssembleBC<upscaled_type<K>>(stack, *((MMesh*)&PUh->Th), Uh, Vh, ds.sym, A.A, nullptr, nullptr, b->largs, ds.tgv);
       }
       changeOperatorSimple(&B, &A);
       if(B._A)
@@ -699,7 +719,7 @@ namespace PETSc {
       }
       int size;
       MPI_Comm_size(A->_A->getCommunicator(), &size);
-      assert(size == 1 || k);
+      ffassert(size == 1 || k);
       communicators->operator[](0).resize(k);
       communicators->resize(2 * k + 1);
     }
@@ -717,7 +737,7 @@ namespace PETSc {
       static const int n_name_param = 2;
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
-      changeOperator_Op(const basicAC_F0& args, int d) : A(0), B(0), c(d) {
+      changeOperator_Op(const basicAC_F0& args, int d) : A(nullptr), B(nullptr), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
         A = to< Type* >(args[0]);
         if (c == 0)
@@ -742,7 +762,7 @@ namespace PETSc {
     {"restriction", &typeid(Matrice_Creuse< double >*)}, {"parent", &typeid(Type*)}};
   template< class Type >
   void change(Type* const& ptA, Matrice_Creuse< upscaled_type<PetscScalar> >* const& mat, Type* const& ptB,
-              Matrice_Creuse< double >* const& pList, Type* const& ptParent) {
+              Type* const& ptParent, Matrice_Creuse< double >* const& pList = nullptr) {
     if (mat) {
       if (ptA) {
         MatriceMorse< upscaled_type<PetscScalar> >* mN = nullptr;
@@ -848,13 +868,16 @@ namespace PETSc {
           PetscInt* ia = nullptr;
           PetscInt* ja = nullptr;
           PetscScalar* c = nullptr;
-          bool free = true;
+          bool free = true, dense = false;
           if (ptA->_cnum) {
             PetscInt* cnum = ptA->_num + dN->HPDDM_n;
             if (ptA->_petsc) {
-                int rank, size, N;
+                int rank, size;
+                PetscInt N;
+                unsigned int flag = mN->nnz && mN->nnz == mN->n * mN->m ? 1 : 0;
                 MPI_Comm_size(PetscObjectComm((PetscObject)ptA->_petsc), &size);
                 if (size > 1) {
+                  PetscBool dense;
                   const PetscInt* ranges;
                   MatGetOwnershipRangesColumn(ptA->_petsc, &ranges);
                   MPI_Comm_rank(PetscObjectComm((PetscObject)ptA->_petsc), &rank);
@@ -864,7 +887,15 @@ namespace PETSc {
                           cnum = new PetscInt[N];
                       MPI_Bcast(cnum, N, MPIU_INT, 0, PetscObjectComm((PetscObject)ptA->_petsc));
                   }
+                  PetscObjectTypeCompareAny((PetscObject)ptA->_petsc, &dense, MATMPIDENSE, MATSEQDENSE, "");
+                  if (!dense)
+                      MPI_Allreduce(MPI_IN_PLACE, &flag, 1, MPI_UNSIGNED, MPI_MAX, PetscObjectComm((PetscObject)ptA->_petsc));
+                  else
+                      flag = true;
                 }
+                if (flag) dense = true;
+                if (dense)
+                  MatSetType(ptA->_petsc, MATDENSE);
             }
             free = HPDDM::template Subdomain< PetscScalar >::distributedCSR(
               ptA->_num, ptA->_first, ptA->_last, ia, ja, c, dN, cnum);
@@ -873,7 +904,8 @@ namespace PETSc {
           }
           else
             free = ptA->_A->distributedCSR(ptA->_num, ptA->_first, ptA->_last, ia, ja, c);
-          if (assembled) {
+          if (assembled || dense) {
+            MatSetOption(ptA->_petsc, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE);
             MatZeroEntries(ptA->_petsc);
             for (PetscInt i = 0; i < ptA->_last - ptA->_first; ++i) {
               PetscInt row = ptA->_first + i;
@@ -887,6 +919,10 @@ namespace PETSc {
               MatCreate(PETSC_COMM_WORLD, &ptA->_petsc);
               MatSetSizes(ptA->_petsc, ptA->_last - ptA->_first, ptA->_last - ptA->_first,
                           PETSC_DECIDE, PETSC_DECIDE);
+            }
+            if (ptA->_exchange) {
+              if (ptA->_exchange[0]) ffassert(ptA->_exchange[0]->getDof() == mN->n);
+              if (ptA->_exchange[1]) ffassert(ptA->_exchange[1]->getDof() == mN->m);
             }
             if (ptA->_A && ptA->_A->getMatrix( )->HPDDM_sym) {
               MatSetType(ptA->_petsc, MATSBAIJ);
@@ -1040,6 +1076,7 @@ namespace PETSc {
             PetscBool assembled;
             MatAssembled(ptB->_petsc, &assembled);
             MatDuplicate(ptB->_petsc, assembled ? MAT_COPY_VALUES : MAT_DO_NOT_COPY_VALUES, &ptA->_petsc);
+            MatShellSetOperation(ptB->_petsc, MATOP_DESTROY, NULL);
             MatDestroy(&ptB->_petsc);
           }
         } else
@@ -1073,17 +1110,17 @@ namespace PETSc {
     Matrice_Creuse< double >* pList =
       nargs[0] ? GetAny< Matrice_Creuse< double >* >((*nargs[0])(stack)) : nullptr;
     Type* ptParent = nargs[1] ? GetAny< Type* >((*nargs[1])(stack)) : nullptr;
-    change(ptA, mat, ptB, pList, ptParent);
+    change(ptA, mat, ptB, ptParent, pList);
     return 0L;
   }
   Dmat* changeOperatorSimple(Dmat* const& dA, Dmat* const& A) {
     Dmat* const null = nullptr;
-    change(dA, nullptr, A, nullptr, null);
+    change(dA, nullptr, A, null);
     return dA;
   }
   Dmat* changeOperatorSimple(Dmat* const& dA, Matrice_Creuse< upscaled_type<PetscScalar> >* const& A) {
     Dmat* const null = nullptr;
-    change(dA, A, null, nullptr, null);
+    change(dA, A, null, null);
     return dA;
   }
   template<class A, class B>
@@ -1224,7 +1261,7 @@ namespace PETSc {
       return 0L;
   }
 
-  template< class HpddmType, int C >
+  template< class HpddmType, int C, bool D = false >
   class initCSRfromDMatrix : public OneOperator {
    public:
     const int c;
@@ -1239,7 +1276,7 @@ namespace PETSc {
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
       initCSRfromDMatrix_Op(const basicAC_F0& args, int d)
-        : A(0), B(0), K(0), codeA(nullptr), c(d) {
+        : A(nullptr), B(nullptr), K(nullptr), codeA(nullptr), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
         A = to< DistributedCSR< HpddmType >* >(args[0]);
         B = to< DistributedCSR< HpddmType >* >(args[1]);
@@ -1268,9 +1305,9 @@ namespace PETSc {
           atype< DistributedCSR< HpddmType >* >( )),
         c(2) {}
   };
-  template< class HpddmType, int C >
+  template< class HpddmType, int C, bool D >
   basicAC_F0::name_and_type
-    initCSRfromDMatrix< HpddmType, C >::initCSRfromDMatrix_Op::name_param[] = {
+    initCSRfromDMatrix< HpddmType, C, D >::initCSRfromDMatrix_Op::name_param[] = {
       {C == 1 ? "transpose" : "clean", C == 1 ? &typeid(Polymorphic*) : &typeid(bool)},
       {"symmetric", &typeid(bool)},
       {"restriction", &typeid(Matrice_Creuse< double >*)}};
@@ -1291,7 +1328,7 @@ namespace PETSc {
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
       initRectangularCSRfromDMatrix_Op(const basicAC_F0& args, int d)
-        : A(0), B(0), C(0), K(0), codeA(nullptr), c(d) {
+        : A(nullptr), B(nullptr), C(nullptr), K(nullptr), codeA(nullptr), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
         A = to< DistributedCSR< HpddmType >* >(args[0]);
         B = to< DistributedCSR< HpddmType >* >(args[1]);
@@ -1608,11 +1645,13 @@ namespace PETSc {
       static const int n_name_param = 6;
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
-      E_initCSR(const basicAC_F0& args, int d) : A(0), K(0), R(0), D(0), c(d) {
+      E_initCSR(const basicAC_F0& args, int d) : A(nullptr), K(nullptr), R(nullptr), D(nullptr), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
         A = to< DistributedCSR< HpddmType >* >(args[0]);
         if (c == 1 || c == 3 || c == 4)
           K = to< long >(args[1]);
+        else if (c == 5)
+          K = to< KNM<Dmat>* >(args[1]);
         else
           K = to< Matrice_Creuse< upscaled_type<PetscScalar> >* >(args[1]);
         if (c == 0 || c == 1) {
@@ -1658,6 +1697,10 @@ namespace PETSc {
       : OneOperator(atype< DistributedCSR< HpddmType >* >( ),
                     atype< DistributedCSR< HpddmType >* >( ), atype< long >( ), atype< long >( )),
         c(4) {}
+    initCSR(int, int, int, int, int)
+      : OneOperator(atype< DistributedCSR< HpddmType >* >( ), atype< DistributedCSR< HpddmType >* >( ),
+                    atype< KNM<DistributedCSR< HpddmType >>* >( )),
+        c(5) {}
   };
   template< class HpddmType, bool C >
   basicAC_F0::name_and_type initCSR< HpddmType, C >::E_initCSR::name_param[] = {
@@ -1670,133 +1713,159 @@ namespace PETSc {
   template< class HpddmType, bool C >
   AnyType initCSR< HpddmType, C >::E_initCSR::operator( )(Stack stack) const {
     DistributedCSR< HpddmType >* ptA = GetAny< DistributedCSR< HpddmType >* >((*A)(stack));
-    KN< KN< long > >* ptR = (c == 0 || c == 1 ? GetAny< KN< KN< long > >* >((*R)(stack)) : nullptr);
-    KN< typename std::conditional< std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value,
-                                   double, long >::type >* ptD =
-      (c == 0 || c == 1
-         ? GetAny< KN< typename std::conditional<
-             std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value, double, long >::type >* >(
-             (*D)(stack))
-         : nullptr), *empty = nullptr;
-    PetscInt bs = nargs[1] ? GetAny< long >((*nargs[1])(stack)) : 1;
-    int dof = 0;
-    MatriceMorse< upscaled_type<PetscScalar> >* mA = nullptr;
-    if (c == 0 || c == 2)
-      mA = static_cast< MatriceMorse< upscaled_type<PetscScalar> >* >(
-        &(*GetAny< Matrice_Creuse< upscaled_type<PetscScalar> >* >((*K)(stack))->A));
-    else
-      dof = GetAny< long >((*K)(stack));
-    MPI_Comm* comm = nargs[0] ? (MPI_Comm*)GetAny< pcommworld >((*nargs[0])(stack)) : 0;
-    if ((c == 2 && mA->n != mA->m) || c == 4) {
-      ptA->_first = 0;
-      ptA->_cfirst = 0;
-      if (c != 4) {
-        ptA->_last = mA->n;
-        ptA->_clast = mA->m;
+    if (c == 5) {
+      MPI_Comm comm1 = MPI_COMM_NULL, comm2 = MPI_COMM_NULL;
+      KNM< Dmat >* pt = GetAny< KNM< Dmat >* >((*K)(stack));
+      ffassert(pt);
+      Mat* array = new Mat[pt->N() * pt->M()]();
+      for (int i = 0; i < pt->N(); ++i) {
+        for (int j = 0; j < pt->M(); ++j) {
+          if (pt->operator()(i, j)._petsc) {
+            array[i * pt->M() + j] = pt->operator()(i, j)._petsc;
+            PetscObjectGetComm((PetscObject)array[i * pt->M() + j], &comm2);
+          }
+          if (comm1 != MPI_COMM_NULL) {
+            int flag;
+            MPI_Comm_compare(comm1, comm2, &flag);
+            ffassert(flag == MPI_CONGRUENT || flag == MPI_IDENT);
+          }
+          comm1 = comm2;
+        }
       }
-      else {
-        ptA->_last = dof;
-        ptA->_clast = GetAny< long >((*R)(stack));
-      }
-      MatCreate(comm ? *comm : PETSC_COMM_WORLD, &ptA->_petsc);
-      MatSetSizes(ptA->_petsc, ptA->_last, ptA->_clast, PETSC_DECIDE, PETSC_DECIDE);
-      MatSetType(ptA->_petsc, MATAIJ);
-      MatSetUp(ptA->_petsc);
-      ptA->_num = new PetscInt[ptA->_last + ptA->_clast];
-      ptA->_cnum = ptA->_num + ptA->_last;
-      PetscInt rbegin, cbegin;
-      MatGetOwnershipRange(ptA->_petsc, &rbegin, NULL);
-      MatGetOwnershipRangeColumn(ptA->_petsc, &cbegin, NULL);
-      std::iota(ptA->_num, ptA->_cnum, rbegin);
-      std::iota(ptA->_cnum, ptA->_cnum + ptA->_clast, cbegin);
-      ptA->_first += rbegin;
-      ptA->_last += rbegin;
-      ptA->_cfirst += cbegin;
-      ptA->_clast += cbegin;
-      if (c != 4) {
-        ff_HPDDM_MatrixCSR< PetscScalar > dA(mA);
-        if(cbegin)
-          for(int i = 0; i < dA.HPDDM_nnz; ++i)
-            dA.HPDDM_ja[i] += cbegin;
-#if defined(PETSC_USE_64BIT_INDICES)
-        PetscInt* ia = new PetscInt[dA.HPDDM_n + 1];
-        std::copy_n(dA.HPDDM_ia, dA.HPDDM_n + 1, ia);
-        PetscInt* ja = new PetscInt[dA.HPDDM_nnz];
-        std::copy_n(dA.HPDDM_ja, dA.HPDDM_nnz, ja);
-        PetscScalar* c = new PetscScalar[dA.HPDDM_nnz];
-        std::copy_n(dA.HPDDM_a, dA.HPDDM_nnz, c);
-        MatSeqAIJSetPreallocationCSR(ptA->_petsc, ia, ja, c);
-        MatMPIAIJSetPreallocationCSR(ptA->_petsc, ia, ja, c);
-        delete[] c;
-        delete[] ja;
-        delete[] ia;
-#else
-        MatSeqAIJSetPreallocationCSR(ptA->_petsc, dA.HPDDM_ia, dA.HPDDM_ja, dA.HPDDM_a);
-        MatMPIAIJSetPreallocationCSR(ptA->_petsc, dA.HPDDM_ia, dA.HPDDM_ja, dA.HPDDM_a);
-#endif
-        if(cbegin)
-          for(int i = 0; i < dA.HPDDM_nnz; ++i)
-            dA.HPDDM_ja[i] -= cbegin;
-      }
+      MatCreateNest(comm1, pt->N(), NULL, pt->M(), NULL, array, &ptA->_petsc);
+      delete [] array;
     }
     else {
-      ptA->_A = new HpddmType;
-      if ((ptR || c == 2 || c == 3) && (mA || (c != 0 && c != 2))) {
-        HPDDM::MatrixCSR< PetscScalar >* dA;
-        if (mA)
-          dA = new_HPDDM_MatrixCSR< PetscScalar >(mA);
-        else
-          dA = new HPDDM::MatrixCSR< PetscScalar >(dof, dof, 0, nullptr, nullptr, nullptr, false);
-        Matrice_Creuse< double >* pList =
-          nargs[4] ? GetAny< Matrice_Creuse< double >* >((*nargs[4])(stack)) : 0;
-        HPDDM::MatrixCSR< void >* dL = nullptr;
-        int level = nargs[5] ? std::abs(GetAny< long >((*nargs[5])(stack))) : 0;
-        KN_< KN< long > > sub((c == 0 || c == 1) && ptR->n > 0 && ptR->operator[](0).n > 0
-                                ? (*ptR)(FromTo(1 + level * ptR->operator[](0).n,
-                                                1 + (level + 1) * ptR->operator[](0).n - 1))
-                                : KN< KN< long > >( ));
-        if (std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value && pList &&
-            (mA || (c != 0 && c != 2))) {
-          int n = 0;
-          ptA->_exchange = new HPDDM::template Subdomain< PetscScalar >*[2]( );
-          ptA->_exchange[0] = new HPDDM::template Subdomain< PetscScalar >( );
-          ptA->_exchange[0]->initialize(
-            dA, STL< long >((c == 0 || c == 1) && ptR->n > 0 ? ptR->operator[](0) : KN< long >( )),
-            sub, comm);
-          ptA->_exchange[0]->setBuffer( );
-          if (pList->A) {
-            MatriceMorse< double >* mList = static_cast< MatriceMorse< double >* >(&*(pList->A));
-            mList->CSR( );
-            ffassert(mList->n == mList->nnz);
-            ffassert(mList->m == (mA ? mA->n : dof));
-            n = mList->n;
-            dL = new HPDDM::MatrixCSR< void >(n, mA ? mA->n : dof, n, mList->p, mList->j, false);
-            ptA->_D = new KN<PetscReal>(n);
-            for (int i = 0; i < n; ++i) ptA->_D->operator[](i) = ptD->operator[](mList->j[i]);
-          } else {
-            dL = new HPDDM::MatrixCSR< void >(0, mA ? mA->n : dof, 0, nullptr, nullptr, false);
-            empty = new KN< typename std::conditional< std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value,
-                                     double, long >::type >(0);
+      KN< KN< long > >* ptR = (c == 0 || c == 1 ? GetAny< KN< KN< long > >* >((*R)(stack)) : nullptr);
+      KN< typename std::conditional< std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value,
+                                     double, long >::type >* ptD =
+        (c == 0 || c == 1
+           ? GetAny< KN< typename std::conditional<
+               std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value, double, long >::type >* >(
+               (*D)(stack))
+           : nullptr), *empty = nullptr;
+      PetscInt bs = nargs[1] ? GetAny< long >((*nargs[1])(stack)) : 1;
+      int dof = 0;
+      MatriceMorse< upscaled_type<PetscScalar> >* mA = nullptr;
+      if (c == 0 || c == 2) {
+        mA = static_cast< MatriceMorse< upscaled_type<PetscScalar> >* >(
+          &(*GetAny< Matrice_Creuse< upscaled_type<PetscScalar> >* >((*K)(stack))->A));
+        if (c == 2) ffassert(mA);
+      }
+      else
+        dof = GetAny< long >((*K)(stack));
+      MPI_Comm* comm = nargs[0] ? (MPI_Comm*)GetAny< pcommworld >((*nargs[0])(stack)) : nullptr;
+      if ((c == 2 && mA->n != mA->m) || c == 4) {
+        ptA->_first = 0;
+        ptA->_cfirst = 0;
+        if (c != 4) {
+          ptA->_last = mA->n;
+          ptA->_clast = mA->m;
+        }
+        else {
+          ptA->_last = dof;
+          ptA->_clast = GetAny< long >((*R)(stack));
+        }
+        MatCreate(comm ? *comm : PETSC_COMM_WORLD, &ptA->_petsc);
+        MatSetSizes(ptA->_petsc, ptA->_last, ptA->_clast, PETSC_DECIDE, PETSC_DECIDE);
+        MatSetType(ptA->_petsc, MATAIJ);
+        MatSetUp(ptA->_petsc);
+        ptA->_num = new PetscInt[ptA->_last + ptA->_clast];
+        ptA->_cnum = ptA->_num + ptA->_last;
+        PetscInt rbegin, cbegin;
+        MatGetOwnershipRange(ptA->_petsc, &rbegin, NULL);
+        MatGetOwnershipRangeColumn(ptA->_petsc, &cbegin, NULL);
+        std::iota(ptA->_num, ptA->_cnum, rbegin);
+        std::iota(ptA->_cnum, ptA->_cnum + ptA->_clast, cbegin);
+        ptA->_first += rbegin;
+        ptA->_last += rbegin;
+        ptA->_cfirst += cbegin;
+        ptA->_clast += cbegin;
+        if (c != 4) {
+          ff_HPDDM_MatrixCSR< PetscScalar > dA(mA);
+          if(cbegin)
+            for(int i = 0; i < dA.HPDDM_nnz; ++i)
+              dA.HPDDM_ja[i] += cbegin;
+#if defined(PETSC_USE_64BIT_INDICES)
+          PetscInt* ia = new PetscInt[dA.HPDDM_n + 1];
+          std::copy_n(dA.HPDDM_ia, dA.HPDDM_n + 1, ia);
+          PetscInt* ja = new PetscInt[dA.HPDDM_nnz];
+          std::copy_n(dA.HPDDM_ja, dA.HPDDM_nnz, ja);
+          PetscScalar* c = new PetscScalar[dA.HPDDM_nnz];
+          std::copy_n(dA.HPDDM_a, dA.HPDDM_nnz, c);
+          MatSeqAIJSetPreallocationCSR(ptA->_petsc, ia, ja, c);
+          MatMPIAIJSetPreallocationCSR(ptA->_petsc, ia, ja, c);
+          delete[] c;
+          delete[] ja;
+          delete[] ia;
+#else
+          MatSeqAIJSetPreallocationCSR(ptA->_petsc, dA.HPDDM_ia, dA.HPDDM_ja, dA.HPDDM_a);
+          MatMPIAIJSetPreallocationCSR(ptA->_petsc, dA.HPDDM_ia, dA.HPDDM_ja, dA.HPDDM_a);
+#endif
+          if(cbegin)
+            for(int i = 0; i < dA.HPDDM_nnz; ++i)
+              dA.HPDDM_ja[i] -= cbegin;
+        }
+      }
+      else {
+        ptA->_A = new HpddmType;
+        if ((ptR || c == 2 || c == 3) && (mA || (c != 0 && c != 2))) {
+          HPDDM::MatrixCSR< PetscScalar >* dA;
+          if (mA)
+            dA = new_HPDDM_MatrixCSR< PetscScalar >(mA);
+          else
+            dA = new HPDDM::MatrixCSR< PetscScalar >(dof, dof, 0, nullptr, nullptr, nullptr, false);
+          Matrice_Creuse< double >* pList =
+            nargs[4] ? GetAny< Matrice_Creuse< double >* >((*nargs[4])(stack)) : nullptr;
+          HPDDM::MatrixCSR< void >* dL = nullptr;
+          int level = nargs[5] ? std::abs(GetAny< long >((*nargs[5])(stack))) : 0;
+          KN_< KN< long > > sub((c == 0 || c == 1) && ptR->n > 0 && ptR->operator[](0).n > 0
+                                  ? (*ptR)(FromTo(1 + level * ptR->operator[](0).n,
+                                                  1 + (level + 1) * ptR->operator[](0).n - 1))
+                                  : KN< KN< long > >( ));
+          if (std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value && pList &&
+              (mA || (c != 0 && c != 2))) {
+            int n = 0;
+            ptA->_exchange = new HPDDM::template Subdomain< PetscScalar >*[2]( );
+            ptA->_exchange[0] = new HPDDM::template Subdomain< PetscScalar >( );
+            ptA->_exchange[0]->initialize(
+              dA, STL< long >((c == 0 || c == 1) && ptR->n > 0 ? ptR->operator[](0) : KN< long >( )),
+              sub, comm);
+            ptA->_exchange[0]->setBuffer( );
+            if (pList->A) {
+              MatriceMorse< double >* mList = static_cast< MatriceMorse< double >* >(&*(pList->A));
+              mList->CSR( );
+              ffassert(mList->n == mList->nnz);
+              ffassert(mList->m == (mA ? mA->n : dof));
+              n = mList->n;
+              dL = new HPDDM::MatrixCSR< void >(n, mA ? mA->n : dof, n, mList->p, mList->j, false);
+              ptA->_D = new KN<PetscReal>(n);
+              for (int i = 0; i < n; ++i) ptA->_D->operator[](i) = ptD->operator[](mList->j[i]);
+            } else {
+              dL = new HPDDM::MatrixCSR< void >(0, mA ? mA->n : dof, 0, nullptr, nullptr, false);
+              empty = new KN< typename std::conditional< std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value,
+                                       double, long >::type >(0);
+            }
           }
-        }
-        ptA->_A->HPDDM::template Subdomain< PetscScalar >::initialize(
-          dA, STL< long >((c == 0 || c == 1) && ptR->n > 0 ? ptR->operator[](0) : KN< long >( )), sub,
-          comm, dL);
-        delete dL;
-        ptA->_num = new PetscInt[ptA->_A->getMatrix( )->HPDDM_n];
-        if (!C && (c == 2 || c == 3)) {
-            long long global;
-            ptA->_A->distributedNumbering(ptA->_num, ptA->_first, ptA->_last, global);
-        }
-        initPETScStructure<C>(ptA, bs,
-          nargs[3] && GetAny< bool >((*nargs[3])(stack)) ? PETSC_TRUE : PETSC_FALSE, empty ? empty : ptD);
-        delete empty;
-        if (!std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value) {
-          mA->p = ptA->_A->getMatrix( )->HPDDM_ia;
-        }
-        if (nargs[2] && GetAny< bool >((*nargs[2])(stack))) {
-          if (ptR) ptR->resize(0);
-          if (c == 0 || c == 2) GetAny< Matrice_Creuse< PetscScalar >* >((*K)(stack))->destroy( );
+          ptA->_A->HPDDM::template Subdomain< PetscScalar >::initialize(
+            dA, STL< long >((c == 0 || c == 1) && ptR->n > 0 ? ptR->operator[](0) : KN< long >( )), sub,
+            comm, dL);
+          delete dL;
+          ptA->_num = new PetscInt[ptA->_A->getMatrix( )->HPDDM_n];
+          if (!C && (c == 2 || c == 3)) {
+              long long global;
+              ptA->_A->distributedNumbering(ptA->_num, ptA->_first, ptA->_last, global);
+          }
+          initPETScStructure<C>(ptA, bs,
+            nargs[3] && GetAny< bool >((*nargs[3])(stack)) ? PETSC_TRUE : PETSC_FALSE, empty ? empty : ptD);
+          delete empty;
+          if (!std::is_same< HpddmType, HpSchwarz< PetscScalar > >::value) {
+            mA->p = ptA->_A->getMatrix( )->HPDDM_ia;
+          }
+          if (nargs[2] && GetAny< bool >((*nargs[2])(stack))) {
+            if (ptR) ptR->resize(0);
+            if (c == 0 || c == 2) GetAny< Matrice_Creuse< PetscScalar >* >((*K)(stack))->destroy( );
+          }
         }
       }
     }
@@ -1831,7 +1900,7 @@ namespace PETSc {
         }
       }
       if (err) CompileError("Wrong format of block matrix");
-      assert(N && M);
+      ffassert(N && M);
       e_M = new Expression*[N];
       t_M = new int*[N];
       for (int i = 0; i < N; ++i) {
@@ -1845,7 +1914,7 @@ namespace PETSc {
           if (r == atype< long >( ) && e->EvaluableWithOutStack( )) {
             long c = GetAny< long >((*e)(NullStack));
             if (c == 0) {
-              e_M[i][j] = 0;
+              e_M[i][j] = nullptr;
               t_M[i][j] = 0;
             } else if (atype< PetscScalar >( )->CastingFrom(r)) {
               e_M[i][j] = to< PetscScalar >(c_M);
@@ -2056,10 +2125,10 @@ namespace PETSc {
       Expression A;
       Expression P;
       const int c;
-      static const int n_name_param = 21;
+      static const int n_name_param = 22;
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
-      setOptions_Op(const basicAC_F0& args, int d) : A(0), P(0), c(d) {
+      setOptions_Op(const basicAC_F0& args, int d) : A(nullptr), P(nullptr), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
         if (c == 0)
           A = to< Type* >(args[0]);
@@ -2110,7 +2179,8 @@ namespace PETSc {
     {"precon", &typeid(Polymorphic*)},                                                            // 17
     {"setup", &typeid(bool)},                                                                     // 18
     {"monitor", &typeid(Polymorphic*)},                                                           // 19
-    {"deflation", &typeid(FEbaseArrayKn<upscaled_type<PetscScalar>>*)}                            // 20
+    {"deflation", &typeid(FEbaseArrayKn<upscaled_type<PetscScalar>>*)},                           // 20
+    {"transposenullspace", &typeid(KNM< upscaled_type<PetscScalar> >*)}                           // 21
   };
   class ShellInjection;
   template< class Type >
@@ -2135,6 +2205,7 @@ namespace PETSc {
   struct _n_User< NonlinearSolver< Type > > {
     typename NonlinearSolver< Type >::VecF_O* op;
     typename LinearSolver< Type >::MatF_O* r;
+    typename NonlinearSolver< Type >::IMonF_O* mon;
     typename NonlinearSolver< Type >::IConvF_O* conv;
   };
   template< class Type >
@@ -2167,7 +2238,7 @@ namespace PETSc {
   }
   template< class T, typename std::enable_if< std::is_same< T, KN< PetscScalar > >::value || std::is_same< T, KN< long > >::value >::type* =
                        nullptr >
-  void resize(T* v, int n, int m) {
+  void resize(T* v, int n, int) {
     v->resize(n);
   }
   template< class T, typename std::enable_if< std::is_same< T, KNM< PetscScalar > >::value || std::is_same< T, KNM< long > >::value >::type* =
@@ -2178,7 +2249,17 @@ namespace PETSc {
   template< class T, typename std::enable_if<
                        !std::is_same< T, KN< PetscScalar > >::value && !std::is_same< T, KNM< PetscScalar > >::value &&
                        !std::is_same< T, KN< long > >::value && !std::is_same< T, KNM< long > >::value>::type* = nullptr >
-  void resize(T* v, int n, int m) {}
+  void resize(T*, int, int) {}
+  template< class T, typename std::enable_if< std::is_same< T, KN< upscaled_type<PetscScalar> > >::value || std::is_same< T, KN< long > >::value >::type* =
+                       nullptr >
+  void init_KN_or_KNM(T* v, T* w) {
+    v->init(w->n);
+  }
+  template< class T, typename std::enable_if< std::is_same< T, KNM< upscaled_type<PetscScalar> > >::value || std::is_same< T, KNM< long > >::value >::type* =
+                       nullptr >
+  void init_KN_or_KNM(T* v, T* w) {
+    v->init(w->N(), w->M());
+  }
   template< class T, class U >
   void changeNumbering_func(PetscInt* const num, PetscInt first, PetscInt last,
                             PetscInt m, PetscInt n, PetscInt bs, T* ptIn, U* ptOut, bool inverse) {
@@ -2358,7 +2439,7 @@ namespace PETSc {
   template< class, class Container, char N = 'N' >
   static PetscErrorCode Op_User(Container, Vec, Vec);
   template< class Type >
-  PetscErrorCode Monitor(KSP ksp, PetscInt it, PetscReal rnorm, void* ctx) {
+  PetscErrorCode Monitor(KSP, PetscInt it, PetscReal rnorm, void* ctx) {
     PetscFunctionBeginUser;
     typename LinearSolver< Type >::MonF_O* mat =
       reinterpret_cast< typename LinearSolver< Type >::MonF_O* >(ctx);
@@ -2372,10 +2453,10 @@ namespace PETSc {
     int level = 0;
     if (c != 0) {
       tabA = GetAny< KN< Dmat >* >((*A)(stack));
-      assert(tabA->N( ) > 0);
+      ffassert(tabA->N( ) > 0);
       if (c == 2) {
         level = GetAny< long >((*P)(stack));
-        assert(0 <= level && level < tabA->N( ));
+        ffassert(0 <= level && level < tabA->N( ));
         level = tabA->N( ) - level - 1;
       }
       ptA = reinterpret_cast< Type* >(&tabA->operator[](level));
@@ -2383,7 +2464,7 @@ namespace PETSc {
     }
     else
       ptA = GetAny< Type* >((*A)(stack));
-    ptParent = nargs[7] ? GetAny< Type* >((*nargs[7])(stack)) : 0;
+    ptParent = nargs[7] ? GetAny< Type* >((*nargs[7])(stack)) : nullptr;
     if (ptParent && ptParent->_ksp) {
       KSP* subksp;
       PetscInt n;
@@ -2530,9 +2611,9 @@ namespace PETSc {
                 MatGetLocalSize(tabA->operator[](i + 1)._petsc, &mCoarse, nullptr);
                 MatGetSize(tabA->operator[](i + 1)._petsc, &MCoarse, nullptr);
                 MatCreateShell(PetscObjectComm((PetscObject)tabA->operator[](i + 1)._petsc), mFine, mCoarse, MFine, MCoarse, user, &P);
-                MatShellSetOperation(P, MATOP_MULT, (void (*)(void))ShellInjectionOp< false >);
-                MatShellSetOperation(P, MATOP_MULT_TRANSPOSE, (void (*)(void))ShellInjectionOp< true >);
-                MatShellSetOperation(P, MATOP_DESTROY, (void (*)(void))ShellDestroy< ShellInjection >);
+                MatShellSetOperation(P, MATOP_MULT, (PetscErrorCodeFn *)ShellInjectionOp< false >);
+                MatShellSetOperation(P, MATOP_MULT_TRANSPOSE, (PetscErrorCodeFn *)ShellInjectionOp< true >);
+                MatShellSetOperation(P, MATOP_DESTROY, (PetscErrorCodeFn *)ShellDestroy< ShellInjection >);
                 PCMGSetInterpolation(pc, level - i - 1, P);
                 MatDestroy(&P);
             } else {
@@ -2565,12 +2646,12 @@ namespace PETSc {
         PetscBool isFieldSplit;
         PetscStrcmp(type, PCFIELDSPLIT, &isFieldSplit);
         if (isFieldSplit) {
-          KN< double >* fields = nargs[2] ? GetAny< KN< double >* >((*nargs[2])(stack)) : 0;
-          KN< String >* names = nargs[3] ? GetAny< KN< String >* >((*nargs[3])(stack)) : 0;
+          KN< double >* fields = nargs[2] ? GetAny< KN< double >* >((*nargs[2])(stack)) : nullptr;
+          KN< String >* names = nargs[3] ? GetAny< KN< String >* >((*nargs[3])(stack)) : nullptr;
           KN< Matrice_Creuse< upscaled_type<PetscScalar> > >* mS =
-            nargs[5] ? GetAny< KN< Matrice_Creuse< upscaled_type<PetscScalar> > >* >((*nargs[5])(stack)) : 0;
-          KN< double >* pL = nargs[6] ? GetAny< KN< double >* >((*nargs[6])(stack)) : 0;
-          KN< Dmat >* mdS = nargs[11] ? GetAny< KN< Dmat >* >((*nargs[11])(stack)) : 0;
+            nargs[5] ? GetAny< KN< Matrice_Creuse< upscaled_type<PetscScalar> > >* >((*nargs[5])(stack)) : nullptr;
+          KN< double >* pL = nargs[6] ? GetAny< KN< double >* >((*nargs[6])(stack)) : nullptr;
+          KN< Dmat >* mdS = nargs[11] ? GetAny< KN< Dmat >* >((*nargs[11])(stack)) : nullptr;
           if (mdS)
             setFieldSplitPC(ptA, ksp, fields, names, mdS);
           else
@@ -2582,43 +2663,36 @@ namespace PETSc {
       if (c != 1) {
         if (std::is_same< Type, Dmat >::value) {
           FEbaseArrayKn< upscaled_type<PetscScalar> >* ptNS =
-            nargs[1] ? GetAny< FEbaseArrayKn< upscaled_type<PetscScalar> >* >((*nargs[1])(stack)) : 0;
+            nargs[1] ? GetAny< FEbaseArrayKn< upscaled_type<PetscScalar> >* >((*nargs[1])(stack)) : nullptr;
           KNM< upscaled_type<PetscScalar> >* ptPETScNS =
-            nargs[8] ? GetAny< KNM< upscaled_type<PetscScalar> >* >((*nargs[8])(stack)) : 0;
+            nargs[8] ? GetAny< KNM< upscaled_type<PetscScalar> >* >((*nargs[8])(stack)) : nullptr;
+          KNM< upscaled_type<PetscScalar> >* ptPETScTNS =
+            nargs[21] ? GetAny< KNM< upscaled_type<PetscScalar> >* >((*nargs[21])(stack)) : nullptr;
           int dim = ptNS ? ptNS->N : 0;
           int dimPETSc = ptPETScNS ? ptPETScNS->M( ) : 0;
-          if (dim || dimPETSc) {
+          int dimPETScT = ptPETScTNS ? ptPETScTNS->N( ) : 0;
+          if (dim) {
             Vec v;
             MatCreateVecs(ptA->_petsc, &v, NULL);
             Vec* ns;
-            VecDuplicateVecs(v, std::max(dim, dimPETSc), &ns);
+            VecDuplicateVecs(v, dim, &ns);
             VecDestroy(&v);
-            if (std::max(dim, dimPETSc) == dimPETSc) {
-              PetscInt m;
-              VecGetLocalSize(ns[0], &m);
-              for (unsigned short i = 0; i < dimPETSc; ++i) {
-                PetscScalar* x;
-                VecGetArray(ns[i], &x);
-                for (int j = 0; j < m; ++j) x[j] = (*ptPETScNS)(j, i);
-                VecRestoreArray(ns[i], &x);
+            for (unsigned short i = 0; i < dim; ++i) {
+              PetscScalar* x;
+              VecGetArray(ns[i], &x);
+              upscaled_type<PetscScalar>* get = *ptNS->get(i);
+              PetscScalar* base = reinterpret_cast<PetscScalar*>(get);
+              if(!std::is_same<upscaled_type<PetscReal>, PetscReal>::value) {
+                  for(int j = 0; j < ptNS->get(i)->n; ++j)
+                      base[j] = get[j];
               }
-            } else
-              for (unsigned short i = 0; i < dim; ++i) {
-                PetscScalar* x;
-                VecGetArray(ns[i], &x);
-                upscaled_type<PetscScalar>* get = *ptNS->get(i);
-                PetscScalar* base = reinterpret_cast<PetscScalar*>(get);
-                if(!std::is_same<upscaled_type<PetscReal>, PetscReal>::value) {
-                    for(int j = 0; j < ptNS->get(i)->n; ++j)
-                        base[j] = get[j];
-                }
-                HPDDM::Subdomain< PetscScalar >::template distributedVec< 0 >(
-                  ptA->_num, ptA->_first, ptA->_last, base,
-                  x, static_cast<PetscInt>(ptNS->get(i)->n));
-                VecRestoreArray(ns[i], &x);
-              }
-            PetscScalar* dots = new PetscScalar[std::max(dim, dimPETSc)];
-            for (unsigned short i = 0; i < std::max(dim, dimPETSc); ++i) {
+              HPDDM::Subdomain< PetscScalar >::template distributedVec< 0 >(
+                ptA->_num, ptA->_first, ptA->_last, base,
+                x, static_cast<PetscInt>(ptNS->get(i)->n));
+              VecRestoreArray(ns[i], &x);
+            }
+            PetscScalar* dots = new PetscScalar[dim - 1];
+            for (unsigned short i = 0; i < dim; ++i) {
               if (i > 0) {
                 VecMDot(ns[i], i, ns, dots);
                 for (int j = 0; j < i; ++j) dots[j] *= -1.0;
@@ -2628,11 +2702,70 @@ namespace PETSc {
             }
             delete[] dots;
             MatNullSpace sp;
-            MatNullSpaceCreate(PetscObjectComm((PetscObject)ptA->_petsc), PETSC_FALSE, std::max(dim, dimPETSc), ns, &sp);
-            if (dim) MatSetNearNullSpace(ptA->_petsc, sp);
-            else MatSetNullSpace(ptA->_petsc, sp);
+            MatNullSpaceCreate(PetscObjectComm((PetscObject)ptA->_petsc), PETSC_FALSE, dim, ns, &sp);
+            MatSetNearNullSpace(ptA->_petsc, sp);
             MatNullSpaceDestroy(&sp);
-            VecDestroyVecs(std::max(dim, dimPETSc), &ns);
+            VecDestroyVecs(dim, &ns);
+          }
+          if (dimPETSc) {
+            Vec v;
+            MatCreateVecs(ptA->_petsc, &v, NULL);
+            Vec* ns;
+            VecDuplicateVecs(v, dimPETSc, &ns);
+            VecDestroy(&v);
+            PetscInt m;
+            VecGetLocalSize(ns[0], &m);
+            for (unsigned short i = 0; i < dimPETSc; ++i) {
+              PetscScalar* x;
+              VecGetArray(ns[i], &x);
+              for (int j = 0; j < m; ++j) x[j] = (*ptPETScNS)(j, i);
+              VecRestoreArray(ns[i], &x);
+            }
+            PetscScalar* dots = new PetscScalar[dimPETSc - 1];
+            for (unsigned short i = 0; i < dimPETSc; ++i) {
+              if (i > 0) {
+                VecMDot(ns[i], i, ns, dots);
+                for (int j = 0; j < i; ++j) dots[j] *= -1.0;
+                VecMAXPY(ns[i], i, dots, ns);
+              }
+              VecNormalize(ns[i], NULL);
+            }
+            delete[] dots;
+            MatNullSpace sp;
+            MatNullSpaceCreate(PetscObjectComm((PetscObject)ptA->_petsc), PETSC_FALSE, dimPETSc, ns, &sp);
+            MatSetNullSpace(ptA->_petsc, sp);
+            MatNullSpaceDestroy(&sp);
+            VecDestroyVecs(dimPETSc, &ns);
+          }
+          if (dimPETScT) {
+            Vec v;
+            MatCreateVecs(ptA->_petsc, NULL, &v);
+            Vec* ns;
+            VecDuplicateVecs(v, dimPETScT, &ns);
+            VecDestroy(&v);
+            PetscInt m;
+            VecGetLocalSize(ns[0], &m);
+            for (unsigned short i = 0; i < dimPETScT; ++i) {
+              PetscScalar* x;
+              VecGetArray(ns[i], &x);
+              for (int j = 0; j < m; ++j) x[j] = (*ptPETScTNS)(j, i);
+              VecRestoreArray(ns[i], &x);
+            }
+            PetscScalar* dots = new PetscScalar[dimPETScT - 1];
+            for (unsigned short i = 0; i < dimPETScT; ++i) {
+              if (i > 0) {
+                VecMDot(ns[i], i, ns, dots);
+                for (int j = 0; j < i; ++j) dots[j] *= -1.0;
+                VecMAXPY(ns[i], i, dots, ns);
+              }
+              VecNormalize(ns[i], NULL);
+            }
+            delete[] dots;
+            MatNullSpace sp;
+            MatNullSpaceCreate(PetscObjectComm((PetscObject)ptA->_petsc), PETSC_FALSE, dimPETScT, ns, &sp);
+            MatSetTransposeNullSpace(ptA->_petsc, sp);
+            MatNullSpaceDestroy(&sp);
+            VecDestroyVecs(dimPETScT, &ns);
           }
           PC pc;
           KSPGetPC(ksp, &pc);
@@ -2661,7 +2794,6 @@ namespace PETSc {
             const HPDDM::MatrixCSR< PetscScalar >* const A = ptA->_A->getMatrix( );
             if (isType) {
               if(nargs[20]) {
-#if PETSC_VERSION_GE(3, 18, 0)
                   Mat Z;
                   FEbaseArrayKn<upscaled_type<PetscScalar>>* deflation = GetAny<FEbaseArrayKn<upscaled_type<PetscScalar>>*>((*nargs[20])(stack));
                   MatCreateSeqDense(PETSC_COMM_SELF, ptA->_A->getDof(), deflation->N, NULL, &Z);
@@ -2672,9 +2804,6 @@ namespace PETSc {
                   MatDenseRestoreArrayWrite(Z, &data);
                   PCHPDDMSetDeflationMat(pc, is, Z);
                   MatDestroy(&Z);
-#else
-                  ffassert(0);
-#endif
               }
               else if(A) {
                 if (!A->HPDDM_ia) {
@@ -2775,7 +2904,7 @@ namespace PETSc {
                 int nnz = dO.HPDDM_nnz;
                 MPI_Allreduce(MPI_IN_PLACE, &nnz, 1, MPI_INT, MPI_MAX, PetscObjectComm((PetscObject)ptA->_petsc));
                 if (nnz) {
-                  MatSetOperation(ptA->_petsc, MATOP_CREATE_SUBMATRICES, (void(*)(void))CustomCreateSubMatrices);
+                  MatSetOperation(ptA->_petsc, MATOP_CREATE_SUBMATRICES, (PetscErrorCodeFn *)CustomCreateSubMatrices);
                   Mat aux = ff_to_PETSc(&dO);
                   IS perm;
                   ISSortPermutation(is, PETSC_TRUE, &perm);
@@ -2787,7 +2916,7 @@ namespace PETSc {
                 PCSetUp(pc);
                 ISDestroy(&loc);
                 if (nnz) {
-                  MatSetOperation(ptA->_petsc, MATOP_CREATE_SUBMATRICES, (void(*)(void))MatCreateSubMatrices);
+                  MatSetOperation(ptA->_petsc, MATOP_CREATE_SUBMATRICES, (PetscErrorCodeFn *)MatCreateSubMatrices);
                   delete O;
                 }
                 O = nullptr;
@@ -2868,7 +2997,11 @@ namespace PETSc {
           const OneOperator* codeM = op->Find(
             "(", ArrayOfaType(atype< long >( ), atype< double >( ), false));
           typename LinearSolver< Type >::MonF_O* mon = new typename LinearSolver< Type >::MonF_O(stack, codeM);
+#if PETSC_VERSION_GE(3, 24, 0)
+          KSPMonitorSet(ksp, Monitor< LinearSolver< Type > >, mon, (PetscCtxDestroyFn *)MonitorDestroy< Type >);
+#else
           KSPMonitorSet(ksp, Monitor< LinearSolver< Type > >, mon, MonitorDestroy< Type >);
+#endif
         }
       }
     }
@@ -2972,7 +3105,7 @@ namespace PETSc {
     return 0L;
   }
   template< class Type, unsigned short O, typename std::enable_if<std::is_same<Type, KNM<PetscScalar>>::value>::type* = nullptr >
-  AnyType view_dispatched(Type* const& ptA, std::string const& o, std::string* const& type, std::string* const& name, MPI_Comm const& comm) {
+  AnyType view_dispatched(Type* const& ptA, std::string const&, std::string* const& type, std::string* const& name, MPI_Comm const& comm) {
     bool pop = false;
     PetscViewer viewer = NULL;
     Mat A;
@@ -3057,7 +3190,7 @@ namespace PETSc {
       static const int n_name_param = 2;
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
-      changeNumbering_Op(const basicAC_F0& args, int d) : A(0), in(0), out(0), c(d) {
+      changeNumbering_Op(const basicAC_F0& args, int d) : A(nullptr), in(nullptr), out(nullptr), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
         if (c != 2) {
           if (c == 1) {
@@ -3137,7 +3270,12 @@ namespace PETSc {
           MatGetLocalSize(ptA->_petsc, &m, NULL);
           if (c != 4) {
             Storage< PetscScalar >* ptIn = GetAny< Storage< PetscScalar >* >((*(E[j].second))(stack));
-            if (!inverse) ffassert(ptIn->N() == ptA->_A->getDof());
+            if (!inverse) {
+              ffassert(ptIn->N() == ptA->_A->getDof());
+              if (j == 0 && ptIn->M() != ptOut->M())
+                PETSc::resize(ptOut, ptOut->N(), ptIn->M());
+            }
+            ffassert(ptIn->M() == ptOut->M());
             if (c != 2) {
               if (inverse) ffassert(ptOut->N() == m);
               changeNumbering_func(ptA->_num, ptA->_first, ptA->_last, m, ptA->_A->getDof(),
@@ -3145,14 +3283,17 @@ namespace PETSc {
             } else {
               sum += m;
               if (ptOut->N() < sum && !inverse) {
-                ffassert(ptIn->M() == 1);
-                ffassert(ptOut->M() == 1);
                 PETSc::resize(ptOut, sum, ptIn->M());
                 pt = *ptOut + sum - m;
               }
-              KN_< PetscScalar > ptOutShift(pt, m);
-              changeNumbering_func(ptA->_num, ptA->_first, ptA->_last, m, ptA->_A->getDof(),
-                                   1, ptIn, &ptOutShift, inverse);
+              else if (inverse && ptIn->N() != ptA->_A->getDof())
+                  PETSc::resize(ptIn, ptA->_A->getDof(), ptIn->M());
+              for (int i = 0; i < ptIn->M(); ++i) {
+                KN_< PetscScalar > ptOutShift(pt + i * ptOut->N(), m);
+                KN_< PetscScalar > ptInShift(*ptIn + i * ptIn->N(), ptA->_A->getDof());
+                changeNumbering_func(ptA->_num, ptA->_first, ptA->_last, m, ptA->_A->getDof(),
+                                     1, &ptInShift, &ptOutShift, inverse);
+              }
             }
             if (inverse && nargs[1] && GetAny< bool >((*nargs[1])(stack))) {
               for(int i = 0; i < ptIn->M(); ++i)
@@ -3468,7 +3609,7 @@ namespace PETSc {
       Expression mat, matT;
       MatF_O(int n, Stack stk, const OneOperator* op, int m = -1, const OneOperator* opT = nullptr)
         : RNM_VirtualMatrix< PetscScalar >(n, m), stack(stk), x(n), c_x(CPValue(x)),
-          mat(op ? CastTo< Kn_ >(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : 0), matT(opT ? CastTo< Kn_ >(C_F0(opT->code(basicAC_F0_wa(c_x)), (aType)*opT)) : 0) {}
+          mat(op ? CastTo< Kn_ >(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : nullptr), matT(opT ? CastTo< Kn_ >(C_F0(opT->code(basicAC_F0_wa(c_x)), (aType)*opT)) : nullptr) {}
       ~MatF_O( ) {
         delete matT;
         delete mat;
@@ -3502,7 +3643,7 @@ namespace PETSc {
       Expression mat;
       MonF_O(Stack stk, const OneOperator* op)
         : stack(stk), s(0), c_s(CPValue(s)), t(0), c_t(CPValue(t)),
-          mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa({c_s, c_t})), (aType)*op)) : 0) {
+          mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa({c_s, c_t})), (aType)*op)) : nullptr) {
       }
       ~MonF_O( ) {
         delete mat;
@@ -3531,9 +3672,9 @@ namespace PETSc {
       static const int n_name_param = 2;
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
-      E_LinearSolver(const basicAC_F0& args, int d) : A(0), x(0), y(0), codeA(0), codeC(0), c(d) {
+      E_LinearSolver(const basicAC_F0& args, int d) : A(nullptr), x(nullptr), y(nullptr), codeA(nullptr), codeC(nullptr), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
-        if (c != 2) {
+        if (c != 2 && c != 6) {
           if (c == 1) {
             const Polymorphic* op = dynamic_cast< const Polymorphic* >(args[0].LeftValue( ));
             ffassert(op);
@@ -3588,13 +3729,17 @@ namespace PETSc {
       : OneOperator(atype< long >( ), atype< Type* >( ), atype< KN< PetscScalar >* >( ),
                     atype< KN< PetscScalar >* >( )),
         c(5) {}
+    LinearSolver(int, int, int, int, int, int)
+      : OneOperator(atype< long >( ), atype< Type* >( ), atype< KNM< PetscScalar >* >( ),
+                    atype< KNM< PetscScalar >* >( )),
+        c(6) {}
   };
   template< class Type >
   basicAC_F0::name_and_type LinearSolver< Type >::E_LinearSolver::name_param[] = {
     {"precon", &typeid(Polymorphic*)}, {"sparams", &typeid(std::string*)}};
   template< class Type >
   AnyType LinearSolver< Type >::E_LinearSolver::operator( )(Stack stack) const {
-    if (c != 2) {
+    if (c != 2 && c != 6) {
       KN< PetscScalar >* in, *out;
       if (c != 4) {
         in = GetAny< KN< PetscScalar >* >((*x)(stack));
@@ -3667,7 +3812,7 @@ namespace PETSc {
         Mat S;
         MatCreateShell(PETSC_COMM_WORLD, in->n, in->n, PETSC_DECIDE, PETSC_DECIDE, user, &S);
         MatShellSetOperation(S, MATOP_MULT,
-                             (void (*)(void))Op_User< LinearSolver< Type >, Mat >);
+                             (PetscErrorCodeFn *)Op_User< LinearSolver< Type >, Mat >);
         Vec x, y;
         MatCreateVecs(S, &x, &y);
         if (out->n != in->n) {
@@ -3739,7 +3884,8 @@ namespace PETSc {
           Mat B, C;
           MatCreateDense(PetscObjectComm((PetscObject)ptA->_ksp), in->N( ), PETSC_DECIDE, M, in->M(), &in->operator( )(0, 0), &B);
           MatCreateDense(PetscObjectComm((PetscObject)ptA->_ksp), out->N( ), PETSC_DECIDE, M, out->M(), &out->operator( )(0, 0), &C);
-          KSPMatSolve(ptA->_ksp, B, C);
+          if (c == 2) KSPMatSolve(ptA->_ksp, B, C);
+          else KSPMatSolveTranspose(ptA->_ksp, B, C);
           MatDestroy(&C);
           MatDestroy(&B);
         }
@@ -3753,8 +3899,8 @@ namespace PETSc {
     }
     return 0L;
   }
-  template< class HpddmType, int C >
-  AnyType initCSRfromDMatrix< HpddmType, C >::initCSRfromDMatrix_Op::operator( )(
+  template< class HpddmType, int C, bool D >
+  AnyType initCSRfromDMatrix< HpddmType, C, D >::initCSRfromDMatrix_Op::operator( )(
     Stack stack) const {
     ffassert((C == 0 && (c == 0 || c == 2)) || (C == c && C == 1));
     DistributedCSR< HpddmType >* ptA = GetAny< DistributedCSR< HpddmType >* >((*A)(stack));
@@ -3779,6 +3925,7 @@ namespace PETSc {
         nargs[2] && c != 1 ? GetAny< Matrice_Creuse< double >* >((*nargs[2])(stack)) : nullptr;
       PetscInt bs;
       MatGetBlockSize(ptB->_petsc, &bs);
+      KN< double >* empty = nullptr;
       if (!pList) {
         ptA->_A = new HpddmType(static_cast< const HPDDM::Subdomain< PetscScalar >& >(*ptB->_A));
         ptA->_A->setMatrix(dA);
@@ -3789,24 +3936,34 @@ namespace PETSc {
         if (ptB->_A->getScaling()) {
             ptA->_D = new KN<PetscReal>(dA->HPDDM_n);
             for (int i = 0; i < dA->HPDDM_n; ++i) ptA->_D->operator[](i) = ptB->_A->getScaling()[i];
+#if !defined(PETSC_USE_REAL_DOUBLE)
+            empty = new KN<double>(dA->HPDDM_n);
+            for (int i = 0; i < dA->HPDDM_n; ++i) empty->operator[](i) = ptB->_A->getScaling()[i];
+#else
+            empty = ptA->_D;
+#endif
         }
-        initPETScStructure<false>(ptA, bs,
+        initPETScStructure<D>(ptA, bs,
           nargs[1] && GetAny< bool >((*nargs[1])(stack)) ? PETSC_TRUE : PETSC_FALSE,
-          ptA->_D);
+          empty);
+#if defined(PETSC_USE_REAL_DOUBLE)
+        empty = nullptr;
+#endif
       } else {
         int n = ptB->_A->getDof();
         ffassert(dA->HPDDM_n == n);
         HPDDM::MatrixCSR< void >* L;
-        KN< double >* empty = nullptr;
         if (pList->A) {
           MatriceMorse< double >* mList = static_cast< MatriceMorse< double >* >(&*(pList->A));
           mList->CSR( );
           ffassert(mList->n == mList->nnz);
           ffassert(mList->m == n);
           L = new HPDDM::MatrixCSR< void >(mList->n, n, mList->n, mList->p, mList->j, false);
-          ptA->_D = new KN<PetscReal>(mList->n);
-          for (int i = 0; i < mList->n; ++i) ptA->_D->operator[](i) = ptB->_A->getScaling()[mList->j[i]];
-          empty = new KN< double >(n, (double*)(ptB->_A->getScaling()));
+          if (ptB->_A->getScaling()) {
+            ptA->_D = new KN<PetscReal>(mList->n);
+            for (int i = 0; i < mList->n; ++i) ptA->_D->operator[](i) = ptB->_A->getScaling()[mList->j[i]];
+            empty = new KN< double >(n, (double*)(ptB->_A->getScaling()));
+          } else empty = new KN< double >(n, 1.0);
         } else {
           L = new HPDDM::MatrixCSR< void >(0, n, 0, nullptr, nullptr, false);
           empty = new KN< double >(0);
@@ -3826,35 +3983,48 @@ namespace PETSc {
           dA, o, r, const_cast<MPI_Comm*>(&comm), L);
         delete L;
         ptA->_num = new PetscInt[ptA->_A->getDof()];
-        initPETScStructure<false>(ptA, bs,
+        initPETScStructure<D>(ptA, bs,
           nargs[1] && GetAny< bool >((*nargs[1])(stack)) ? PETSC_TRUE : PETSC_FALSE, empty);
-        delete empty;
         if (c != 0 || !ptK->A)
             delete dA;
       }
-      if (c == 1) {
-        MatSetType(ptA->_petsc, MATSHELL);
-        User< LinearSolver< Dmat > > user = nullptr;
-        PetscNew(&user);
-        user->op = nullptr;
-        const Polymorphic* op = nargs[0] ? dynamic_cast< const Polymorphic* >(nargs[0]) : nullptr;
-        if(op) {
-            const OneOperator* codeAt = op->Find("(", ArrayOfaType(atype< KN< PetscScalar >* >( ), false));
-            if (codeAt) {
-              user->op = new LinearSolver< Dmat >::MatF_O(ptB->_last - ptB->_first, stack, codeA, -1, codeAt);
-              MatShellSetOperation(ptA->_petsc, MATOP_MULT_TRANSPOSE,
-                      (void (*)(void))Op_User< LinearSolver< Mat >, Mat, 'T' >);
-            }
-        }
-        if(!user->op) user->op = new LinearSolver< Dmat >::MatF_O(ptB->_last - ptB->_first, stack, codeA);
-        MatShellSetContext(ptA->_petsc, user);
-        MatShellSetOperation(ptA->_petsc, MATOP_MULT,
-                             (void (*)(void))Op_User< LinearSolver< Mat >, Mat >);
-        MatShellSetOperation(ptA->_petsc, MATOP_DESTROY, (void (*)(void))ShellDestroy< LinearSolver< Dmat >  >);
-        MatSetUp(ptA->_petsc);
+      delete empty;
+    } else if (ptB->_petsc) {
+      if (c != 1) {
+        PetscBool assembled;
+
+        MatAssembled(ptB->_petsc, &assembled);
+        MatDuplicate(ptB->_petsc, assembled ? MAT_COPY_VALUES : MAT_DO_NOT_COPY_VALUES, &ptA->_petsc);
+      } else {
+        PetscInt m, M, n, N;
+
+        MatGetLocalSize(ptB->_petsc, &m, &n);
+        MatGetSize(ptB->_petsc, &M, &N);
+        MatCreate(PetscObjectComm((PetscObject)ptB->_petsc), &ptA->_petsc);
+        MatSetSizes(ptA->_petsc, m, n, M, N);
       }
-    } else if(ptB->_petsc) {
-      MatDuplicate(ptB->_petsc, MAT_COPY_VALUES, &ptA->_petsc);
+    }
+    if (c == 1) {
+      ffassert(ptA->_petsc);
+      MatSetType(ptA->_petsc, MATSHELL);
+      User< LinearSolver< Dmat > > user = nullptr;
+      PetscNew(&user);
+      user->op = nullptr;
+      const Polymorphic* op = nargs[0] ? dynamic_cast< const Polymorphic* >(nargs[0]) : nullptr;
+      if(op) {
+          const OneOperator* codeAt = op->Find("(", ArrayOfaType(atype< KN< PetscScalar >* >( ), false));
+          if (codeAt) {
+            user->op = new LinearSolver< Dmat >::MatF_O(ptB->_last - ptB->_first, stack, codeA, -1, codeAt);
+            MatShellSetOperation(ptA->_petsc, MATOP_MULT_TRANSPOSE,
+                    (PetscErrorCodeFn *)Op_User< LinearSolver< Mat >, Mat, 'T' >);
+          }
+      }
+      if(!user->op) user->op = new LinearSolver< Dmat >::MatF_O(ptB->_last - ptB->_first, stack, codeA);
+      MatShellSetContext(ptA->_petsc, user);
+      MatShellSetOperation(ptA->_petsc, MATOP_MULT,
+                           (PetscErrorCodeFn *)Op_User< LinearSolver< Mat >, Mat >);
+      MatShellSetOperation(ptA->_petsc, MATOP_DESTROY, (PetscErrorCodeFn *)ShellDestroy< LinearSolver< Dmat >  >);
+      MatSetUp(ptA->_petsc);
     }
     if (c == 0 && nargs[0] && GetAny< bool >((*nargs[0])(stack))) ptK->destroy( );
     return ptA;
@@ -3868,7 +4038,8 @@ namespace PETSc {
     DistributedCSR< HpddmType >* ptC = GetAny< DistributedCSR< HpddmType >* >((*C)(stack));
     Matrice_Creuse< upscaled_type<PetscScalar> >* ptK =
       (c == 0 || c == 3 ? GetAny< Matrice_Creuse< upscaled_type<PetscScalar> >* >((*K)(stack)) : nullptr);
-    if (ptB->_A && ptC->_A) {
+    if (ptB->_petsc && ptC->_petsc) {
+      if (ptA->_petsc) ptA->dtor( );
       ptA->_first = ptB->_first;
       ptA->_last = ptB->_last;
       ptA->_cfirst = ptC->_first;
@@ -3885,7 +4056,7 @@ namespace PETSc {
         PetscInt* ja = nullptr;
         PetscScalar* a = nullptr;
         bool free = true;
-        if (ptK->A) {
+        if (ptK && ptK->A) {
           MatriceMorse< upscaled_type<PetscScalar> >* mA = static_cast< MatriceMorse< upscaled_type<PetscScalar> >* >(&(*ptK->A));
           ff_HPDDM_MatrixCSR< PetscScalar > dA(mA);
           ptA->_num = new PetscInt[mA->n + (ptC->_A && ptC->_A->getMatrix() ? ptC->_A->getMatrix()->HPDDM_m : mA->m)];
@@ -3925,34 +4096,43 @@ namespace PETSc {
               if (codeAt) {
                   user->op = new LinearSolver< Dmat >::MatF_O(ptC->_last - ptC->_first, stack, codeA, ptB->_last - ptB->_first, codeAt);
                   MatShellSetOperation(ptA->_petsc, MATOP_MULT_TRANSPOSE,
-                          (void (*)(void))Op_User< LinearSolver< Mat >, Mat, 'T' >);
+                          (PetscErrorCodeFn *)Op_User< LinearSolver< Mat >, Mat, 'T' >);
               }
           }
           if(!user->op) user->op = new LinearSolver< Dmat >::MatF_O(ptC->_last - ptC->_first, stack, codeA, ptB->_last - ptB->_first);
           MatShellSetContext(ptA->_petsc, user);
           MatShellSetOperation(ptA->_petsc, MATOP_MULT,
-                               (void (*)(void))Op_User< LinearSolver< Mat >, Mat >);
-          MatShellSetOperation(ptA->_petsc, MATOP_DESTROY, (void (*)(void))ShellDestroy< LinearSolver< Dmat >  >);
+                               (PetscErrorCodeFn *)Op_User< LinearSolver< Mat >, Mat >);
+          MatShellSetOperation(ptA->_petsc, MATOP_DESTROY, (PetscErrorCodeFn *)ShellDestroy< LinearSolver< Dmat >  >);
         }
         MatSetUp(ptA->_petsc);
-        MatSetOption(ptA->_petsc, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE);
-        if(ptB->_A->getMatrix() && ptC->_A->getMatrix()) {
-          ptA->_num = new PetscInt[ptB->_A->getMatrix( )->HPDDM_n + ptC->_A->getMatrix( )->HPDDM_m];
-          ptA->_cnum = ptA->_num + ptB->_A->getMatrix( )->HPDDM_n;
-          std::copy_n(ptB->_num, ptB->_A->getMatrix( )->HPDDM_n, ptA->_num);
-          std::copy_n(ptC->_num, ptC->_A->getMatrix( )->HPDDM_m, ptA->_cnum);
+        if(ptB->_A && ptC->_A) {
+          MatSetOption(ptA->_petsc, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE);
+          if(ptB->_A->getMatrix() && ptC->_A->getMatrix()) {
+            ptA->_num = new PetscInt[ptB->_A->getMatrix( )->HPDDM_n + ptC->_A->getMatrix( )->HPDDM_m];
+            ptA->_cnum = ptA->_num + ptB->_A->getMatrix( )->HPDDM_n;
+            std::copy_n(ptB->_num, ptB->_A->getMatrix( )->HPDDM_n, ptA->_num);
+            std::copy_n(ptC->_num, ptC->_A->getMatrix( )->HPDDM_m, ptA->_cnum);
+          } else {
+            ptA->_num = new PetscInt[ptB->_A->getDof() + ptC->_A->getDof()];
+            ptA->_cnum = ptA->_num + ptB->_A->getDof();
+            std::copy_n(ptB->_num, ptB->_A->getDof(), ptA->_num);
+            std::copy_n(ptC->_num, ptC->_A->getDof(), ptA->_cnum);
+          }
         } else {
-          ptA->_num = new PetscInt[ptB->_A->getDof() + ptC->_A->getDof()];
-          ptA->_cnum = ptA->_num + ptB->_A->getDof();
-          std::copy_n(ptB->_num, ptB->_A->getDof(), ptA->_num);
-          std::copy_n(ptC->_num, ptC->_A->getDof(), ptA->_cnum);
+          ptA->_num = new PetscInt[ptB->_last - ptB->_first + ptC->_last - ptC->_first];
+          ptA->_cnum = ptA->_num + ptB->_last - ptB->_first;
+          std::copy_n(ptB->_num, ptB->_last - ptB->_first, ptA->_num);
+          std::copy_n(ptC->_num, ptC->_last - ptC->_first, ptA->_cnum);
         }
       }
-      ptA->_exchange = new HPDDM::template Subdomain< PetscScalar >*[2];
-      ptA->_exchange[0] = new HPDDM::template Subdomain< PetscScalar >(*ptB->_A);
-      ptA->_exchange[0]->setBuffer( );
-      ptA->_exchange[1] = new HPDDM::template Subdomain< PetscScalar >(*ptC->_A);
-      ptA->_exchange[1]->setBuffer( );
+      if(ptB->_A && ptC->_A) {
+        ptA->_exchange = new HPDDM::template Subdomain< PetscScalar >*[2];
+        ptA->_exchange[0] = new HPDDM::template Subdomain< PetscScalar >(*ptB->_A);
+        ptA->_exchange[0]->setBuffer( );
+        ptA->_exchange[1] = new HPDDM::template Subdomain< PetscScalar >(*ptC->_A);
+        ptA->_exchange[1]->setBuffer( );
+      } else ptA->_exchange = nullptr;
     }
     if (c == 0 && nargs[0] && GetAny< bool >((*nargs[0])(stack))) ptK->destroy( );
     if (c != 3)
@@ -3977,10 +4157,10 @@ namespace PETSc {
       Expression mat;
       VecF_O(int n, Stack stk, const OneOperator* op)
         : stack(stk), x(n), c_x(CPValue(x)),
-          mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : 0) {}
+          mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : nullptr) {}
       VecF_O(int n, Stack stk, const OneOperator* op, int)
         : stack(stk), x(n), c_x(CPValue(x)),
-          mat(op ? CastTo< PetscReal >(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : 0) {}
+          mat(op ? CastTo< PetscReal >(C_F0(op->code(basicAC_F0_wa(c_x)), (aType)*op)) : nullptr) {}
       VecF_O(int n, Stack stk, const OneOperator* op, int, int ni, int ne)
         : stack(stk), x(n), c_x(CPValue(x)), x_e(std::max(0, ne)), c_x_e( ), x_i(std::max(0, ni)),
           c_x_i( ), mat( ) {
@@ -4057,7 +4237,7 @@ namespace PETSc {
         : stack(stk), t(0), c_t(CPValue(t)), x(n), c_x(CPValue(x)), x_t(n), c_x_t(CPValue(x_t)),
           a(0), c_a(CPValue(a)),
           mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa({c_t, c_x, c_x_t, c_a})), (aType)*op))
-                 : 0) {}
+                 : nullptr) {}
       ~IVecF_O( ) {
         delete mat;
         Expression zzz = c_t;
@@ -4092,10 +4272,10 @@ namespace PETSc {
       IMatF_O(int n, Stack stk, const OneOperator* op)
         : stack(stk), t(0), c_t(CPValue(t)), x(n), c_x(CPValue(x)), x_t(n), c_x_t(CPValue(x_t)),
           mat(op ? CastTo< Kn_ >(C_F0(op->code(basicAC_F0_wa({c_t, c_x, c_x_t})), (aType)*op))
-                 : 0) {}
+                 : nullptr) {}
       IMatF_O(int n, Stack stk, const OneOperator* op, int)
         : stack(stk), t(0), c_t(CPValue(t)), x(n), c_x(CPValue(x)),
-          mat(op ? CastTo< Kn_ >(C_F0(op->code(basicAC_F0_wa({c_t, c_x})), (aType)*op)) : 0) {}
+          mat(op ? CastTo< Kn_ >(C_F0(op->code(basicAC_F0_wa({c_t, c_x})), (aType)*op)) : nullptr) {}
       ~IMatF_O( ) {
         delete mat;
         Expression zzz = c_t;
@@ -4133,7 +4313,7 @@ namespace PETSc {
       Expression mat;
       IMonF_O(int n, Stack stk, const OneOperator* op)
         : stack(stk), s(0), c_s(CPValue(s)), t(0), c_t(CPValue(t)), x(n), c_x(CPValue(x)),
-          mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa({c_s, c_t, c_x})), (aType)*op)) : 0) {
+          mat(op ? CastTo< long >(C_F0(op->code(basicAC_F0_wa({c_s, c_t, c_x})), (aType)*op)) : nullptr) {
       }
       ~IMonF_O( ) {
         delete mat;
@@ -4176,7 +4356,7 @@ namespace PETSc {
           c_dx(CPValue(dx)),
           mat(op ? CastTo< long >(C_F0(
                      op->code(basicAC_F0_wa({c_it, c_xnorm, c_gnorm, c_f, c_x, c_dx})), (aType)*op))
-                 : 0) {}
+                 : nullptr) {}
       ~IConvF_O( ) {
         delete mat;
         Expression zzz = c_it;
@@ -4216,11 +4396,11 @@ namespace PETSc {
       Expression x;
       const OneOperator *codeJ, *codeR, *codeRHS;
       const int c;
-      static const int n_name_param = 12;
+      static const int n_name_param = 13;
       static basicAC_F0::name_and_type name_param[];
       Expression nargs[n_name_param];
       E_NonlinearSolver(const basicAC_F0& args, int d)
-        : A(0), J(0), r(0), x(0), codeJ(0), codeR(0), codeRHS(0), c(d) {
+        : A(nullptr), J(nullptr), r(nullptr), x(nullptr), codeJ(nullptr), codeR(nullptr), codeRHS(nullptr), c(d) {
         args.SetNameParam(n_name_param, name_param, nargs);
         A = to< Type* >(args[0]);
         const Polymorphic* op = dynamic_cast< const Polymorphic* >(args[1].LeftValue( ));
@@ -4293,9 +4473,11 @@ namespace PETSc {
     {"JacobianEquality", &typeid(Polymorphic*)},
     {"JI", &typeid(Type*)},
     {"JE", &typeid(Type*)},
-    {"reason", &typeid(long*)}};
+    {"reason", &typeid(long*)},
+    {"convergence", &typeid(Polymorphic*)}
+  };
   template< class Type >
-  PetscErrorCode FormJacobian(SNES snes, Vec x, Mat J, Mat B, void* ctx) {
+  PetscErrorCode FormJacobian(SNES, Vec x, Mat, Mat, void* ctx) {
     User< Type >* user;
     const PetscScalar* in;
 
@@ -4308,6 +4490,23 @@ namespace PETSc {
     long ret = mat->apply(xx);
     VecRestoreArrayRead(x, &in);
     PetscFunctionReturn(PetscErrorCode(ret));
+  }
+  template<class Type>
+  PetscErrorCode Monitor(SNES snes, PetscInt it, PetscReal norm, void* ctx) {
+    User<Type>* user;
+    const PetscScalar* in;
+    Vec u;
+
+    PetscFunctionBeginUser;
+    user = reinterpret_cast< User< Type >* >(ctx);
+    typename NonlinearSolver< Type >::IMonF_O* mat =
+        reinterpret_cast<typename NonlinearSolver< Type >::IMonF_O* >((*user)->mon);
+    SNESGetSolution(snes, &u);
+    VecGetArrayRead(u, &in);
+    KN_< PetscScalar > xx(const_cast< PetscScalar* >(in), mat->x.n);
+    mat->apply(it, norm, xx);
+    VecRestoreArrayRead(u, &in);
+    PetscFunctionReturn(PETSC_SUCCESS);
   }
   template< class Type >
   PetscErrorCode Convergence(SNES snes, PetscInt it, PetscReal xnorm, PetscReal gnorm, PetscReal f,
@@ -4330,12 +4529,17 @@ namespace PETSc {
     SNESConvergedDefault(snes, it, xnorm, gnorm, f, reason, ctx);
     if (*reason == SNES_CONVERGED_ITERATING)
       *reason = SNESConvergedReason(mat->apply(it, xnorm, gnorm, f, xx, ww));
+    else if (*reason > 0) {
+      PetscInt userreason = mat->apply(it, xnorm, gnorm, f, xx, ww);
+      if (userreason < 0)
+        *reason = SNESConvergedReason(userreason);
+    }
     VecRestoreArrayRead(du, &din);
     VecRestoreArrayRead(u, &in);
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   template< class Type, int I >
-  PetscErrorCode FormJacobianTao(Tao tao, Vec x, Mat J, Mat B, void* ctx) {
+  PetscErrorCode FormJacobianTao(Tao tao, Vec x, Mat J, Mat, void* ctx) {
     User< Type >* user;
     const PetscScalar* in;
 
@@ -4375,7 +4579,7 @@ namespace PETSc {
     PetscFunctionReturn(PetscErrorCode(ret));
   }
   template< class Type, int I >
-  PetscErrorCode FormConstraintsTao(Tao obj, Vec x, Vec c, void* ctx) {
+  PetscErrorCode FormConstraintsTao(Tao, Vec x, Vec c, void* ctx) {
     User< Type >* user;
     const PetscScalar* in;
     PetscScalar* out;
@@ -4395,7 +4599,7 @@ namespace PETSc {
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   template< class PType, class Type >
-  PetscErrorCode FormFunction(PType obj, Vec x, Vec f, void* ctx) {
+  PetscErrorCode FormFunction(PType, Vec x, Vec f, void* ctx) {
     User< Type >* user;
     const PetscScalar* in;
     PetscScalar* out;
@@ -4414,7 +4618,7 @@ namespace PETSc {
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   template< class Type >
-  PetscErrorCode FormObjectiveRoutine(Tao tao, Vec x, PetscReal* f, void* ctx) {
+  PetscErrorCode FormObjectiveRoutine(Tao, Vec x, PetscReal* f, void* ctx) {
     User< Type >* user;
     const PetscScalar* in;
 
@@ -4429,7 +4633,7 @@ namespace PETSc {
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   template< class Type >
-  PetscErrorCode FormIJacobian(TS ts, PetscReal t, Vec u, Vec u_t, PetscReal a, Mat J, Mat B,
+  PetscErrorCode FormIJacobian(TS, PetscReal t, Vec u, Vec u_t, PetscReal a, Mat, Mat,
                                void* ctx) {
     User< Type >* user;
     const PetscScalar *in, *in_t;
@@ -4448,7 +4652,7 @@ namespace PETSc {
     PetscFunctionReturn(PetscErrorCode(ret));
   }
   template< class Type >
-  PetscErrorCode FormIFunction(TS ts, PetscReal t, Vec u, Vec u_t, Vec F, void* ctx) {
+  PetscErrorCode FormIFunction(TS, PetscReal t, Vec u, Vec u_t, Vec F, void* ctx) {
     User< Type >* user;
     const PetscScalar *in, *in_t;
     PetscScalar* out;
@@ -4470,7 +4674,7 @@ namespace PETSc {
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   template< class Type >
-  PetscErrorCode FormRHSFunction(TS ts, PetscReal t, Vec u, Vec F, void* ctx) {
+  PetscErrorCode FormRHSFunction(TS, PetscReal t, Vec u, Vec F, void* ctx) {
     User< Type >* user;
     const PetscScalar* in;
     PetscScalar* out;
@@ -4489,7 +4693,7 @@ namespace PETSc {
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   template< class Type >
-  PetscErrorCode Monitor(TS ts, PetscInt step, PetscReal time, Vec u, void* ctx) {
+  PetscErrorCode Monitor(TS, PetscInt step, PetscReal time, Vec u, void* ctx) {
     User< Type >* user;
     const PetscScalar* in;
 
@@ -4649,6 +4853,7 @@ namespace PETSc {
           PetscNew(&user);
           user->op = new NonlinearSolver< Type >::VecF_O(in->n, stack, codeJ);
           user->r = new typename LinearSolver< Type >::MatF_O(in->n, stack, codeR);
+          user->mon = nullptr;
           user->conv = nullptr;
           SNES snes;
           SNESCreate(PETSC_COMM_WORLD, &snes);
@@ -4675,10 +4880,19 @@ namespace PETSc {
           if (op) {
             ffassert(op);
             const OneOperator* codeM =
+              op->Find("(", ArrayOfaType(atype< long >( ), atype< double >( ),
+                                          atype< KN< PetscScalar >* >( ), false));
+            user->mon = new NonlinearSolver< Type >::IMonF_O(in->n, stack, codeM);
+            SNESMonitorSet(snes, Monitor< NonlinearSolver< Type > >, &user, NULL);
+          }
+          op = nargs[12] ? dynamic_cast< const Polymorphic* >(nargs[12]) : nullptr;
+          if (op) {
+            ffassert(op);
+            const OneOperator* codeC =
               op->Find("(", ArrayOfaType(atype< long >( ), atype< double >( ), atype< double >( ),
                                          atype< double >( ), atype< KN< PetscScalar >* >( ),
                                          atype< KN< PetscScalar >* >( ), false));
-            user->conv = new NonlinearSolver< Type >::IConvF_O(in->n, stack, codeM);
+            user->conv = new NonlinearSolver< Type >::IConvF_O(in->n, stack, codeC);
             SNESSetConvergenceTest(snes, Convergence< NonlinearSolver< Type > >, &user, NULL);
           }
           SNESSolve(snes, c == 1 ? f : NULL, x);
@@ -4695,6 +4909,7 @@ namespace PETSc {
           }
           SNESDestroy(&snes);
           delete user->conv;
+          delete user->mon;
           delete user->r;
           delete user->op;
           PetscFree(user);
@@ -4827,7 +5042,7 @@ namespace PETSc {
                               type = MATHERMITIANTRANSPOSEVIRTUAL;
                           }
                       } else MatGetSize(mat[i][j], &n, &m);
-                      if(isType && m >= n) {
+                      if(isType && m >= n && !(cast[i * N + j] && cast[i * N + j]->_num)) {
                           PetscMPIInt rank;
                           MPI_Comm_rank(PetscObjectComm((PetscObject)mat[i][j]), &rank);
                           if(rank == 0) {
@@ -4855,7 +5070,7 @@ namespace PETSc {
                                   first = cast[i * N + j]->_first;
                                   last = cast[i * N + j]->_last;
                               }
-                              A = cast[i * N + j]->_exchange[isType ? 1 : 0];
+                              if(cast[i * N + j]->_exchange) A = cast[i * N + j]->_exchange[isType ? 1 : 0];
                               n = A ? A->getDof() : 0;
                           }
                           else {
@@ -4893,9 +5108,16 @@ namespace PETSc {
     InvPETSc(T v, U w) : t(v), u(w) {}
     void solve(U out) const {
       if ((*t)._petsc) {
+        Mat X, Y;
         Vec x, y;
         double timing = MPI_Wtime( );
         MatCreateVecs((*t)._petsc, &x, &y);
+        ffassert(out->N() == u->N() && out->M() == u->M());
+        int mu = 1;
+        if ((*t)._A) {
+          ffassert(out->n % (*t)._A->getDof() == 0);
+          mu = out->n / (*t)._A->getDof();
+        } else ffassert(out->M() == 1);
         PetscScalar* ptr;
         MatType type;
         PetscBool isType;
@@ -4903,6 +5125,7 @@ namespace PETSc {
         PetscStrcmp(type, MATNEST, &isType);
         PetscScalar* p = reinterpret_cast<PetscScalar*>(u->operator upscaled_type<PetscScalar>*());
         if ((*t)._vector_global) {
+          ffassert(mu == 1);
           for(int i = 0; i < u->n; ++i)
               p[i] = u->operator[](i);
           MPI_Allreduce(MPI_IN_PLACE, p, u->n, HPDDM::Wrapper<K>::mpi_type(), MPI_SUM, PetscObjectComm((PetscObject)(*t)._petsc));
@@ -4945,28 +5168,55 @@ namespace PETSc {
           }
           VecRestoreArray(x, &ptr);
         }
-        else if ( std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
+        else if (std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
                           HpSchwarz< PetscScalar > >::value) {
-          VecGetArray(x, &ptr);
-          for(int i = 0; i < u->n; ++i)
+#if !defined(PETSC_USE_REAL_DOUBLE)
+          ffassert(mu == 1);
+          for(int i = 0; i < u->N(); ++i)
               p[i] = u->operator[](i);
-          if(isType) {
-            ffassert((std::is_same<PetscReal, upscaled_type<PetscReal>>::value));
-            loopDistributedVec<0, 'N'>((*t)._petsc, (*t)._exchange, u, ptr);
+#else
+          static_assert(std::is_same<PetscReal, upscaled_type<PetscReal>>::value, "Wrong types");
+#endif
+          if (mu == 1) {
+            VecGetArray(x, &ptr);
+            if(isType) {
+              ffassert((std::is_same<PetscReal, upscaled_type<PetscReal>>::value));
+              loopDistributedVec<0, 'N'>((*t)._petsc, (*t)._exchange, u, ptr);
+            }
+            else
+              HPDDM::Subdomain< K >::template distributedVec< 0 >((*t)._num, (*t)._first, (*t)._last,
+                                                                  p, ptr,
+                                                                  static_cast<PetscInt>(u->N()), 1);
+            VecRestoreArray(x, &ptr);
           }
-          else
-            HPDDM::Subdomain< K >::template distributedVec< 0 >((*t)._num, (*t)._first, (*t)._last,
-                                                                p, ptr,
-                                                                static_cast<PetscInt>(u->n), 1);
-          VecRestoreArray(x, &ptr);
+          else {
+            ffassert(!isType);
+            PetscInt m, M;
+            MatGetLocalSize((*t)._petsc, &m, nullptr);
+            MatGetSize((*t)._petsc, &M, nullptr);
+            MatCreateDense(PetscObjectComm((PetscObject)(*t)._petsc), m, PETSC_DECIDE, M, mu, nullptr, &X);
+            MatCreateDense(PetscObjectComm((PetscObject)(*t)._petsc), m, PETSC_DECIDE, M, mu, nullptr, &Y);
+            MatDenseGetArrayWrite(X, &ptr);
+            for(int j = 0; j < mu; ++j) {
+              PetscScalar* in = p + j * (*t)._A->getDof();
+              PetscScalar* out = ptr + j * m;
+              HPDDM::Subdomain< K >::template distributedVec< 0 >((*t)._num, (*t)._first, (*t)._last,
+                                                                  in, out,
+                                                                  static_cast<PetscInt>((*t)._A->getDof()), 1);
+            }
+            MatDenseRestoreArrayWrite(X, &ptr);
+          }
           if ((*t)._ksp) {
             PetscBool nonZero;
             KSPGetInitialGuessNonzero((*t)._ksp, &nonZero);
             if (nonZero) {
+              ffassert(mu == 1);
               VecGetArray(y, &ptr);
               p = reinterpret_cast<PetscScalar*>(out->operator upscaled_type<PetscScalar>*());
+#if !defined(PETSC_USE_REAL_DOUBLE)
               for(int i = 0; i < out->n; ++i)
                   p[i] = out->operator[](i);
+#endif
               if(isType)
                 loopDistributedVec<0, 'N'>((*t)._petsc, (*t)._exchange, out, ptr);
               else
@@ -4978,6 +5228,7 @@ namespace PETSc {
           }
           *out = K();
         } else {
+          ffassert(mu == 1);
           VecSet(x, PetscScalar( ));
           Vec isVec;
           VecCreateMPIWithArray(PETSC_COMM_SELF, 1, (*t)._A->getMatrix( )->HPDDM_n,
@@ -4995,9 +5246,7 @@ namespace PETSc {
         if (isType) {
           PC pc;
           KSPGetPC((*t)._ksp, &pc);
-          PCType type;
-          PCGetType(pc, &type);
-          PetscStrcmp(type, PCFIELDSPLIT, &isType);
+          PetscObjectTypeCompareAny((PetscObject)pc, &isType, PCNONE, PCJACOBI, PCFIELDSPLIT, PCSHELL, "");
           if (!isType) {
             Mat C;
             prepareConvert((*t)._petsc, &C);
@@ -5006,12 +5255,20 @@ namespace PETSc {
             isType = PETSC_TRUE;
           }
         }
-        if (trans == 'N')
-          KSPSolve((*t)._ksp, x, y);
+        if (trans == 'N') {
+          if (mu == 1) KSPSolve((*t)._ksp, x, y);
+          else KSPMatSolve((*t)._ksp, X, Y);
+        }
         else {
-          if (!std::is_same< PetscScalar, PetscReal >::value && t.conjugate) VecConjugate(x);
-          KSPSolveTranspose((*t)._ksp, x, y);
-          if (!std::is_same< PetscScalar, PetscReal >::value && t.conjugate) VecConjugate(y);
+          if (mu == 1) {
+            if (!std::is_same< PetscScalar, PetscReal >::value && t.conjugate) VecConjugate(x);
+            KSPSolveTranspose((*t)._ksp, x, y);
+            if (!std::is_same< PetscScalar, PetscReal >::value && t.conjugate) VecConjugate(y);
+          } else {
+            if (!std::is_same< PetscScalar, PetscReal >::value && t.conjugate) MatConjugate(X);
+            KSPMatSolveTranspose((*t)._ksp, X, Y);
+            if (!std::is_same< PetscScalar, PetscReal >::value && t.conjugate) MatConjugate(Y);
+          }
         }
         if (verbosity > 0 && mpirank == 0)
           cout << " --- system solved with PETSc (in " << MPI_Wtime( ) - timing << ")" << endl;
@@ -5061,13 +5318,28 @@ namespace PETSc {
         }
         else if (std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
                           HpSchwarz< PetscScalar > >::value) {
-          VecGetArray(y, &ptr);
-          if(isType)
-            loopDistributedVec<1, 'N'>((*t)._petsc, (*t)._exchange, out, ptr);
-          else
-            HPDDM::Subdomain< K >::template distributedVec< 1 >((*t)._num, (*t)._first, (*t)._last, p,
-                                                                ptr, static_cast<PetscInt>(out->n), 1);
-          VecRestoreArray(y, &ptr);
+          if (mu == 1) {
+            VecGetArray(y, &ptr);
+            if(isType)
+              loopDistributedVec<1, 'N'>((*t)._petsc, (*t)._exchange, out, ptr);
+            else
+              HPDDM::Subdomain< K >::template distributedVec< 1 >((*t)._num, (*t)._first, (*t)._last, p,
+                                                                  ptr, static_cast<PetscInt>(out->N()), 1);
+            VecRestoreArray(y, &ptr);
+          } else {
+            PetscInt m;
+            MatGetLocalSize((*t)._petsc, &m, nullptr);
+            MatDenseGetArrayWrite(Y, &ptr);
+            for(int j = 0; j < mu; ++j) {
+              PetscScalar* in = p + j * (*t)._A->getDof();
+              PetscScalar* out = ptr + j * m;
+              HPDDM::Subdomain< K >::template distributedVec< 1 >((*t)._num, (*t)._first, (*t)._last, in,
+                                                                  out, static_cast<PetscInt>((*t)._A->getDof()), 1);
+            }
+            MatDenseRestoreArrayWrite(Y, &ptr);
+            MatDestroy(&X);
+            MatDestroy(&Y);
+          }
         } else {
           Vec isVec;
           VecCreateMPIWithArray(PETSC_COMM_SELF, 1, (*t)._A->getMatrix( )->HPDDM_n,
@@ -5081,16 +5353,17 @@ namespace PETSc {
         if (std::is_same< typename std::remove_reference< decltype(*t.A->_A) >::type,
                           HpSchwarz< PetscScalar > >::value &&
             t.A->_A)
-          (*t)._A->exchange(p);
+          (*t)._A->exchange(p, mu);
         if(!std::is_same<PetscReal, upscaled_type<PetscReal>>::value) {
-          for(int i = out->n - 1; i >= 0; --i)
+          ffassert(mu == 1);
+          for(int i = out->N() - 1; i >= 0; --i)
             out->operator[](i) = p[i];
           p = reinterpret_cast<PetscScalar*>(u->operator upscaled_type<PetscScalar>*());
-          for(int i = u->n - 1; i >= 0; --i)
+          for(int i = u->N() - 1; i >= 0; --i)
             u->operator[](i) = p[i];
         }
       }
-    };
+    }
     static U inv(U Ax, InvPETSc< T, U, K, trans > A) {
       A.solve(Ax);
       return Ax;
@@ -5099,7 +5372,7 @@ namespace PETSc {
       PetscInt n, m;
       MatGetSize(A.t.A->_petsc, &n, &m);
       ffassert(n == m);
-      Ax->init(A.u->n);
+      init_KN_or_KNM(Ax, A.u);
       return inv(Ax, A);
     }
   };
@@ -5175,12 +5448,12 @@ namespace PETSc {
             loopDistributedVec<0, N>(t->_petsc, t->_exchange, u, ptr);
           } else {
             if(t->_A)
-              assert(u->n == t->_A->getDof() && out->n == t->_A->getDof());
+              ffassert(u->n == t->_A->getDof() && out->n == t->_A->getDof());
             else if (t->_exchange) {
               if (N == 'T') {
-                assert(u->n == t->_exchange[0]->getDof() && out->n == t->_exchange[1]->getDof());
+                ffassert(u->n == t->_exchange[0]->getDof() && out->n == t->_exchange[1]->getDof());
               } else {
-                assert(u->n == t->_exchange[1]->getDof() && out->n == t->_exchange[0]->getDof());
+                ffassert(u->n == t->_exchange[1]->getDof() && out->n == t->_exchange[0]->getDof());
               }
             }
             for(int i = 0; i < u->n; ++i)
@@ -5357,6 +5630,7 @@ namespace PETSc {
     Global.Add("ChangeNumbering", "(", new PETSc::changeNumbering< Dmat, KN >(1, 1));
     Global.Add("ChangeNumbering", "(", new PETSc::changeNumbering< Dmat, KN >(1, 1, 1));
     Global.Add("ChangeNumbering", "(", new PETSc::changeNumbering< Dmat, KNM >( ));
+    Global.Add("ChangeNumbering", "(", new PETSc::changeNumbering< Dmat, KNM >(1, 1));
     Global.Add("ChangeNumbering", "(", new PETSc::changeNumbering< Dmat, KNM >(1, 1, 1, 1));
     Global.Add("MatMult", "(",
                new OneOperator3_< long, Dmat*, KN< PetscScalar >*, KN< PetscScalar >* >(
@@ -5393,6 +5667,7 @@ namespace PETSc {
       Global.Add("KSPSolveHermitianTranspose", "(", new PETSc::LinearSolver< Dmat >(1, 1, 1));
     Global.Add("KSPSolve", "(", new PETSc::LinearSolver< Dmat >(1, 1, 1, 1));
     Global.Add("KSPSolveTranspose", "(", new PETSc::LinearSolver< Dmat >(1, 1, 1, 1, 1));
+    Global.Add("KSPSolveTranspose", "(", new PETSc::LinearSolver< Dmat >(1, 1, 1, 1, 1, 1));
     Global.Add("KSPGetConvergedReason", "(", new OneOperator1_< long, Dmat* >(PETSc::GetConvergedReason< Dmat >));
     Global.Add("KSPGetIterationNumber", "(", new OneOperator1_< long, Dmat* >(PETSc::GetIterationNumber< Dmat >));
     Global.Add("KSPSetResidualHistory", "(", new OneOperator2_< long, Dmat*, KN< double >* >(PETSc::SetResidualHistory< Dmat >));
@@ -5591,7 +5866,7 @@ namespace PETSc {
       Expression A;
       Expression B;
       const int c;
-      DMPlexToFF_Op(const basicAC_F0& args, int d) : A(0), B(0), c(d) {
+      DMPlexToFF_Op(const basicAC_F0& args, int d) : A(nullptr), B(nullptr), c(d) {
         B = to<DMPlex*>(args[1]);
         if(c == 0)
             A = to< Mesh const** >(args[0]);
@@ -5879,7 +6154,7 @@ namespace PETSc {
      public:
       Expression A;
       Expression B;
-      buildSolution_Op(const basicAC_F0& args) : A(0), B(0) {
+      buildSolution_Op(const basicAC_F0& args) : A(nullptr), B(nullptr) {
         A = to<Dmat*>(args[0]);
         B = to<KN<upscaled_type<PetscScalar>>*>(args[1]);
       }
@@ -5980,7 +6255,7 @@ namespace PETSc {
         Op(Expression aa,Expression  bb,int initt)
           : b(new Call_CompositeFormBilinear<vect_generic_v_fes,vect_generic_v_fes>(* dynamic_cast<const Call_CompositeFormBilinear<vect_generic_v_fes,vect_generic_v_fes> *>(bb))),a(aa),init(initt)
       {
-        assert(b && b->nargs);
+        ffassert(b && b->nargs);
         int NN = (int) b->euh->componentNbitem().size();
         int MM = (int) b->evh->componentNbitem().size();
 
@@ -6005,7 +6280,7 @@ namespace PETSc {
     { return  new Op(to<PETSc::DistributedCSR< HpddmType >*>(args[0]),args[1],init); }
     OpMatrixtoBilinearFormVGPETSc(int initt=0) :
       OneOperator(atype<PETSc::DistributedCSR< HpddmType >*>(),atype<PETSc::DistributedCSR< HpddmType >*>(),atype<const Call_CompositeFormBilinear<vect_generic_v_fes,vect_generic_v_fes>*>()),
-      init(initt){};
+      init(initt){}
 
   };
 
@@ -6122,7 +6397,7 @@ namespace PETSc {
   AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) const
   {
     typedef PetscScalar R;
-    assert(b && b->nargs);
+    ffassert(b && b->nargs);
 
     pvectgenericfes  * pUh= GetAny<pvectgenericfes *>((*b->euh)(stack));
     pvectgenericfes  * pVh= GetAny<pvectgenericfes *>((*b->evh)(stack));
@@ -6455,7 +6730,7 @@ namespace PETSc {
                                                           0, 0, (*pUh)->vect[i], (*pVh)->vect[j],
                                                           true, false, ds.sym, ds.tgv, ds.commworld,
                                                           b_largs_zz, stack,
-                                                          0, 0, Afem.pHM());
+                                                          nullptr, nullptr, Afem.pHM());
 
             nsparseblocks++;
           }
@@ -6520,7 +6795,7 @@ static void Init_PETSc( ) {
   int argc = pkarg->n;
   char** argv = new char*[argc];
   for (int i = 0; i < argc; ++i) argv[i] = const_cast< char* >((*(*pkarg)[i].getap( ))->c_str( ));
-  PetscInitialize(&argc, &argv, 0, "");
+  PetscInitialize(&argc, &argv, nullptr, "");
   PetscSysInitializePackage( );
   MatInitializePackage( );
 #ifndef HPDDM_SLEPC
@@ -6551,6 +6826,7 @@ static void Init_PETSc( ) {
   TheOperators->Add("<-", new PETSc::initCSR< HpSchwarz< PetscScalar > >(1, 1));
   TheOperators->Add("<-", new PETSc::initCSR< HpSchwarz< PetscScalar > >(1, 1, 1));
   TheOperators->Add("<-", new PETSc::initCSR< HpSchwarz< PetscScalar > >(1, 1, 1, 1));
+  TheOperators->Add("<-", new PETSc::initCSR< HpSchwarz< PetscScalar > >(1, 1, 1, 1, 1));
   Global.Add("constructor", "(", new PETSc::initCSR< HpSchwarz< PetscScalar >, true >);
   Global.Add("constructor", "(", new PETSc::initCSR< HpSchwarz< PetscScalar >, true >(1));
   Global.Add("constructor", "(", new PETSc::initCSR< HpSchwarz< PetscScalar >, true >(1, 1, 1));
@@ -6565,6 +6841,7 @@ static void Init_PETSc( ) {
   TheOperators->Add("<-", new PETSc::initCSRfromDMatrix< HpSchwarz< PetscScalar >, 0 >);
   TheOperators->Add("<-", new PETSc::initCSRfromDMatrix< HpSchwarz< PetscScalar >, 1 >);
   TheOperators->Add("<-", new PETSc::initCSRfromDMatrix< HpSchwarz< PetscScalar >, 0 >(1));
+  Global.Add("constructor", "(", new PETSc::initCSRfromDMatrix< HpSchwarz< PetscScalar >, 0, true >);
   TheOperators->Add("<-", new PETSc::initRectangularCSRfromDMatrix< HpSchwarz< PetscScalar >, 0 >);
   TheOperators->Add("<-", new PETSc::initRectangularCSRfromDMatrix< HpSchwarz< PetscScalar >, 1 >);
   TheOperators->Add("<-", new PETSc::initRectangularCSRfromDMatrix< HpSchwarz< PetscScalar >, 0 >(1));
@@ -6574,16 +6851,13 @@ static void Init_PETSc( ) {
   TheOperators->Add("<-", new PETSc::OpMatrixtoBilinearFormVGPETSc< HpSchwarz< PetscScalar> >(1));
   TheOperators->Add(
     "=", new OneOperatorCode< PETSc::assignBlockMatrix< HpSchwarz< PetscScalar > > >( ),
-         new PETSc::varfToMat< PetscScalar, Mesh, v_fes, v_fes >,
+         new PETSc::varfToMat< PetscScalar, Mesh , v_fes , v_fes  >,
          new PETSc::varfToMat< PetscScalar, Mesh3, v_fes3, v_fes3 >,
          new PETSc::varfToMat< PetscScalar, MeshS, v_fesS, v_fesS >,
-         new PETSc::varfToMat< PetscScalar, MeshL, v_fesL, v_fesL >
-#if defined(WITH_bemtool) && defined(WITH_htool)
-                                                                   ,
+         new PETSc::varfToMat< PetscScalar, MeshL, v_fesL, v_fesL >,
          new PETSc::varfToMat< PetscScalar, MeshL, v_fesL, v_fes  >,
          new PETSc::varfToMat< PetscScalar, MeshL, v_fesL, v_fesS >,
-         new PETSc::varfToMat< PetscScalar, MeshS, v_fesS, v_fes  >
-#endif
+         new PETSc::varfToMat< PetscScalar, MeshL, v_fes , v_fesL >
                                                                    );
 #if defined(WITH_bemtool) && defined(WITH_htool) && defined(PETSC_HAVE_HTOOL)
   typedef const BemKernel fkernel;
@@ -6593,6 +6867,10 @@ static void Init_PETSc( ) {
   addProd< Dmat, PETSc::ProdPETSc, KN< upscaled_type<PetscScalar> >, PetscScalar, 'T' >( );
   addInv< Dmat, PETSc::InvPETSc, KN< upscaled_type<PetscScalar> >, PetscScalar, 'N' >( );
   addInv< Dmat, PETSc::InvPETSc, KN< upscaled_type<PetscScalar> >, PetscScalar, 'T' >( );
+  Dcl_Type<PETSc::InvPETSc<pwr<Dmat>, KNM< upscaled_type<PetscScalar> >*, PetscScalar, 'N'>>();
+  TheOperators->Add("*", new OneBinaryOperator_st<assign<PETSc::InvPETSc<pwr<Dmat>,  KNM< upscaled_type<PetscScalar> >*, PetscScalar, 'N'>, pwr<Dmat>,  KNM< upscaled_type<PetscScalar> >*>>);
+  TheOperators->Add("=", new OneOperator2<KNM< upscaled_type<PetscScalar> >*, KNM< upscaled_type<PetscScalar> >*, PETSc::InvPETSc<pwr<Dmat>, KNM< upscaled_type<PetscScalar> >*, PetscScalar, 'N'>>(PETSc::InvPETSc<pwr<Dmat>, KNM< upscaled_type<PetscScalar> >*, PetscScalar, 'N'>::inv));
+  TheOperators->Add("<-", new OneOperator2<KNM< upscaled_type<PetscScalar> >*, KNM< upscaled_type<PetscScalar> >*, PETSc::InvPETSc<pwr<Dmat>, KNM< upscaled_type<PetscScalar> >*, PetscScalar, 'N'>>(PETSc::InvPETSc<pwr<Dmat>, KNM< upscaled_type<PetscScalar> >*, PetscScalar, 'N'>::init));
   Global.Add("set", "(", new PETSc::setOptions< Dmat >( ));
   Global.Add("set", "(", new PETSc::setOptions< Dmat >(1));
   Global.Add("set", "(", new PETSc::setOptions< Dmat >(1, 1));
@@ -6632,4 +6910,8 @@ static void Init_PETSc( ) {
 }
 #ifndef PETScandSLEPc
 LOADFUNC(Init_PETSc)
+#endif
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
 #endif

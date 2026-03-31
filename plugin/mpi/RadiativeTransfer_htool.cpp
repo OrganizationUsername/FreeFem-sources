@@ -1,4 +1,17 @@
 //ff-c++-LIBRARY-dep: mpi pthread htool
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
+#include <mpi.h>
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic pop
+#endif
 #include <htool/htool.hpp>
 #include <ff++.hpp>
 #include <AFunction_ext.hpp>
@@ -17,7 +30,7 @@ public:
     double zend, zstart;
     double dx, dy, dz;
 
-    void init() {tab = 0;}
+    void init() {tab = nullptr;}
     void destroy() {delete tab;}
 };
 
@@ -72,7 +85,7 @@ double KappaGrid_eval(KappaGrid *const &a, const double &xi, const double &yi, c
     iy = max(0, min(iy, a->ny - 1));
     iz = max(0, min(iz, a->nz - 1));
 
-    return (*a->tab)(ix, iy, iz);
+    return static_cast<double>((*a->tab)(ix, iy, iz));
 }
 
 //////////////////////////// used for the volume integral ////////////////////////////
@@ -100,7 +113,7 @@ public:
             int j = Th(k,e2[e][1]);
             SortArray2 ij(i,j);
             auto nKV = edges.find(ij);
-            if( nKV==0) nKV = edges.add(ij, ne++); // new
+            if( nKV==nullptr) nKV = edges.add(ij, ne++); // new
         }
         if (mpirank == 0 && verbosity) cout << " nb edge + sommets = "<< ne << endl;
 
@@ -139,7 +152,7 @@ public:
         SortArray2 ij(i,j);
         auto nKV = edges.find(jj);
         auto nKVij = edges.find(ij);
-        if (nKVij == 0) exact = 2; // i and j not in same element -> use lower order quadrature
+        if (nKVij == nullptr) exact = 2; // i and j not in same element -> use lower order quadrature
         const GQuadratureFormular<R3> * pQF = QF_Simplex<R3> (exact), QF = *pQF;
         int ie = nKV->v;
 

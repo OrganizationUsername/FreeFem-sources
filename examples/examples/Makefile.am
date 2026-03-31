@@ -45,6 +45,7 @@ TESTS_OTHER = BlackScholes2D.md \
 	test1.edp \
 	thermal.md \
 	thermic.md \
+	thermal-contact-conductance-composite.md \
 	dist-projection.md
 
 TESTS_ARPARCK = sound.md
@@ -86,6 +87,15 @@ makeref.edp: regtests.m4 ../../etc/config/m4/regtests.m4
 # To check the scripts against their reference values
 regtests.edp: regtests.m4 ../../etc/config/m4/regtests.m4
 	m4 -DASSERT regtests.m4 > regtests.edp
+
+clean-local:
+	@for file in *.edp; do \
+		base=$${file%.edp}; \
+		if test -f "$$base.md"; then \
+			rm -f "$$file"; \
+		fi; \
+	done
+	-rm -r *.ps *.eps *.msh
 
 freefem++.pref:Makefile
 	echo includepath = \"../../idp/\" > freefem++.pref

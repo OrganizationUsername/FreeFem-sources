@@ -20,13 +20,13 @@
 [Setup]
 AppName=FreeFem++-win`'SIZEOFPTR-VERSION
 AppVerName=FreeFem++ version VERSION (win SIZEOFPTR bits)
-DefaultDirName={pf}\FreeFem++`'SUFF64
+DefaultDirName={commonpf}\FreeFem++`'SUFF64
 DefaultGroupName=FreeFem++`'SUFF64
-
+PrivilegesRequired=admin
 Compression=lzma
 SolidCompression=yes
 ChangesAssociations=yes
-OutputBaseFilename=FreeFem++-VERSION-win`'SIZEOFPTR
+OutputBaseFilename=FreeFEM-VERSION-amd64-win`'SIZEOFPTR
 ChangesEnvironment=yes
 
 [Dirs]
@@ -44,6 +44,7 @@ Name: "{app}\idp"; Permissions: everyone-full
 IFMPI Name: "{app}\examples\mpi"; Permissions: everyone-full
 IFMPI Name: "{app}\examples\hpddm"; Permissions: everyone-full
 IFMPI Name: "{app}\examples\ffddm"; Permissions: everyone-full
+IFMPI Name: "{app}\examples\bem"; Permissions: everyone-full
 
 ; PETSc
 IFPETSC Name: "{app}\ff-petsc"; Permissions: everyone-full
@@ -95,23 +96,42 @@ Source: "plugin\seq\ff-get-dep"; DestDir: "{app}"
 
 
 IFMGW32 ; mingw32  ....    FH. I have put all dll in bin-win32 dir ....
-IFMGW32 Source: "C:\MinGW\bin\mingwm10.dll"; DestDir: "{app}"
-; Source: "C:\Cygwin\bin\glut32.dll"; DestDir: "{app}"
-IFMGW32 Source: "C:\MinGW\msys\1.0\bin\freeglut.dll"; DestDir: "{app}"
-IFMGW32 Source: "C:\MinGW\bin\pthreadGC2.dll"; DestDir: "{app}"
-IFMGW32 Source: "C:\MinGW\bin\libgcc_s_dw2-1.dll"; DestDir: "{app}"
-IFMGW32 Source: "C:\MinGW\bin\libstdc++-6.dll"; DestDir: "{app}"
-IFMGW32 Source: "C:\MinGW\bin\libgfortran-*.dll"; DestDir: "{app}"
-IFMGW32 Source: "C:\MinGW\bin\libquadmath-*.dll"; DestDir: "{app}"
+#ifexist "C:\MinGW\bin\mingwm10.dll"
+	IFMGW32 Source: "C:\MinGW\bin\mingwm10.dll"; DestDir: "{app}"
+	; Source: "C:\Cygwin\bin\glut32.dll"; DestDir: "{app}"
+	IFMGW32 Source: "C:\MinGW\msys\1.0\bin\freeglut.dll"; DestDir: "{app}"
+	IFMGW32 Source: "C:\MinGW\bin\pthreadGC2.dll"; DestDir: "{app}"
+	IFMGW32 Source: "C:\MinGW\bin\libgcc_s_dw2-1.dll"; DestDir: "{app}"
+	IFMGW32 Source: "C:\MinGW\bin\libstdc++-6.dll"; DestDir: "{app}"
+	IFMGW32 Source: "C:\MinGW\bin\libgfortran-*.dll"; DestDir: "{app}"
+	IFMGW32 Source: "C:\MinGW\bin\libquadmath-*.dll"; DestDir: "{app}"
 
-IFMGW64 Source: "C:\msys64\mingw64\bin\libgcc_s_seh-*.dll"; DestDir: "{app}"
-IFMGW64 Source: "C:\msys64\mingw64\bin\libstdc++-*.dll"; DestDir: "{app}"
-IFMGW64 Source: "C:\msys64\mingw64\bin\libwinpthread-1.dll"; DestDir: "{app}"
-IFMGW64 Source: "C:\msys64\mingw64\bin\libgfortran-*.dll"; DestDir: "{app}"
-IFMGW64 Source: "C:\msys64\mingw64\bin\libquadmath-*.dll"; DestDir: "{app}"
-IFMGW64 Source: "C:\msys64\mingw64\bin\libfreeglut.dll"; DestDir: "{app}"
-IFMGW64 Source: "C:\msys64\mingw64\bin\libgsl*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "C:\msys64\mingw64\bin\libgcc_s_seh-*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "C:\msys64\mingw64\bin\libstdc++-*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "C:\msys64\mingw64\bin\libwinpthread-1.dll"; DestDir: "{app}"
+	IFMGW64 Source: "C:\msys64\mingw64\bin\libgfortran-*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "C:\msys64\mingw64\bin\libquadmath-*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "C:\msys64\mingw64\bin\libfreeglut.dll"; DestDir: "{app}"
+	IFMGW64 Source: "C:\msys64\mingw64\bin\libgsl*.dll"; DestDir: "{app}"
+#endif
+#ifexist "D:\MinGW\bin\mingwm10.dll"
+	IFMGW32 Source: "D:\MinGW\bin\mingwm10.dll"; DestDir: "{app}"
+	; Source: "D:\Cygwin\bin\glut32.dll"; DestDir: "{app}"
+	IFMGW32 Source: "D:\MinGW\msys\1.0\bin\freeglut.dll"; DestDir: "{app}"
+	IFMGW32 Source: "D:\MinGW\bin\pthreadGC2.dll"; DestDir: "{app}"
+	IFMGW32 Source: "D:\MinGW\bin\libgcc_s_dw2-1.dll"; DestDir: "{app}"
+	IFMGW32 Source: "D:\MinGW\bin\libstdc++-6.dll"; DestDir: "{app}"
+	IFMGW32 Source: "D:\MinGW\bin\libgfortran-*.dll"; DestDir: "{app}"
+	IFMGW32 Source: "D:\MinGW\bin\libquadmath-*.dll"; DestDir: "{app}"
 
+	IFMGW64 Source: "D:\msys64\mingw64\bin\libgcc_s_seh-*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "D:\msys64\mingw64\bin\libstdc++-*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "D:\msys64\mingw64\bin\libwinpthread-1.dll"; DestDir: "{app}"
+	IFMGW64 Source: "D:\msys64\mingw64\bin\libgfortran-*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "D:\msys64\mingw64\bin\libquadmath-*.dll"; DestDir: "{app}"
+	IFMGW64 Source: "D:\msys64\mingw64\bin\libfreeglut.dll"; DestDir: "{app}"
+	IFMGW64 Source: "D:\msys64\mingw64\bin\libgsl*.dll"; DestDir: "{app}"
+#endif
 
 IFMGW64 ; mingw64 ....   FH. I have put all dll in bin-win32 dir ....
 
@@ -145,6 +165,7 @@ Source: "examples\3dCurve\*.edp"; DestDir: "{app}\examples\3dCurve"
 IFMPI Source: "examples\mpi\ff*.txt"; DestDir: "{app}\examples\mpi"
 IFMPI Source: "examples\mpi\*.edp"; DestDir: "{app}\examples\mpi"
 IFMPI Source: "examples\hpddm\*.edp"; DestDir: "{app}\examples\hpddm"
+IFMPI Source: "examples\bem\*.edp"; DestDir: "{app}\examples\bem"
 ;Source: "0ldUserReadMe.txt"; DestDir: "{app}\examples\load"
 ;Source: "0ldUserReadMe.txt"; DestDir: "{app}\examples\tutorial"
 ;Source: "0ldUserReadMe.txt"; DestDir: "{app}\examples\examples"
@@ -152,7 +173,12 @@ IFMPI Source: "examples\hpddm\*.edp"; DestDir: "{app}\examples\hpddm"
 ;Source: "0ldUserReadMe.txt"; DestDir: "{app}\examples\eigen"
 
 ;PETSc
+#if DirExists("FFPETSC")
 IFPETSC Source: "FFPETSC\*"; DestDir: "{app}\ff-petsc"; Flags: recursesubdirs
+#endif
+#if DirExists("D:\a\_temp\msys64\mingw64\ff-petsc\")
+IFPETSC Source: "D:\a\_temp\msys64\mingw64\ff-petsc\*"; DestDir: "{app}\ff-petsc"; Flags: recursesubdirs
+#endif
 
 ; Documentation files may need to be copied from another machine if
 ; Cygwin refuses to build them.
@@ -181,6 +207,8 @@ Name: "{group}\Examples\3dSurf"; Filename: "{app}\examples\3dSurf"
 Name: "{group}\Examples\3dCurve"; Filename: "{app}\examples\3dCurve"
 IFMPI Name: "{group}\Examples\mpi"; Filename: "{app}\examples\mpi"
 IFMPI Name: "{group}\Examples\hpddm"; Filename: "{app}\examples\hpddm"
+IFMPI Name: "{group}\Examples\bem"; Filename: "{app}\examples\bem"
+
 Name: "{group}\Uninstall FreeFem++ VERSION"; Filename: "{uninstallexe}"
 
 ; Desktop
@@ -205,7 +233,7 @@ Name: modifypath; Description: &Add application directory to your system path (i
 [Code]
 const
 	ModPathName = 'modifypath';
-	ModPathType = 'user';
+	ModPathType = 'system';
 
 function ModPathDir(): TArrayOfString;
 begin

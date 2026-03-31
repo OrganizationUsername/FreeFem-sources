@@ -1,0 +1,10 @@
+/*  Bug comment in macro undew window */
+int bb = 1;
+NewMacro aa 
+//  a comment in macro 
+bb = 2; 
+EndMacro
+// 
+aa 
+assert(bb == 2);
+cout << " Ok " << bb == 2 << endl;

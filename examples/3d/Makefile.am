@@ -31,7 +31,6 @@ TESTS_OTHER = 3d-leman.md \
 	cone.md \
 	convect-3d.md \
 	cube-period.md \
-	cylinder-3d.md \
 	EqPoisson.md \
 	extract-boundary3d.md \
 	first.md \
@@ -60,6 +59,7 @@ TESTS_OTHER = 3d-leman.md \
 TESTS_METIS = schwarz-nm-3d.md
 
 TESTS_TETGEN = cylinder.edp \
+	cylinder-3d.md \
 	Poisson3d.md \
 	Poisson-cube-ballon.md \
 	refinesphere.md \
@@ -67,7 +67,7 @@ TESTS_TETGEN = cylinder.edp \
 	tetgenholeregion.md
 
 TESTS_TETGEN_MMG = Sphere-Isocahedron.md Period-Poisson-cube-ballon.md \
-	sphereincube.md
+	sphereincube.md adaptindicator3dP1.md
 
 TESTS_TETGEN_MMG_MSHMET = Laplace-Adapt-aniso-3d.md
 
@@ -107,8 +107,8 @@ endif TETGEN
 TESTS = $(TESTS_OTHER) \
 	$(TESTS_METIS) \
 	$(TESTS_TETGEN) \
-	$(TESTS_TETGEN_FREEYAMS) \
-	$(TESTS_TETGEN_FREEYAMS_MMG3D_MSHMET) \
+	$(TESTS_TETGEN_MMG) \
+	$(TESTS_TETGEN_MMG_MMG3D_MSHMET) \
 	$(TESTS_TETGEN_GSL)  \
 	$(TESTS_TETGEN_MMG3D_MMG) \
 	$(TESTS_TETGEN_MSHMET)
@@ -160,5 +160,13 @@ regtests.edp: regtests.m4 ../../etc/config/m4/regtests.m4
 echo:
 	echo $(LIST_CONDITIONAL)
 	echo $(LIST)
-	
+
+clean-local:
+	@for file in *.edp; do \
+		base=$${file%.edp}; \
+		if test -f "$$base.md"; then \
+			rm -f "$$file"; \
+		fi; \
+	done
+
 FORCE:

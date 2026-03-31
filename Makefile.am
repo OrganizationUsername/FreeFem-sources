@@ -21,6 +21,7 @@
 # E-MAIL  :
 # add F. Hecht 
 bin_PROGRAMS=bin/md2edp
+bin_md2edp_SOURCES=etc/tools/md2edp.cpp
 
 SUBDIRS=3rdparty src \
 	plugin  \
@@ -102,14 +103,6 @@ EXTRA_DIST=README.md CHANGELOG.md AUTHORS\
 	etc/logo/logo.bmp \
 	etc/doxygen/mainpage.dox \
 	etc/doxygen/Doxyfile \
-	etc/jenkins \
-	etc/jenkins/install.sh \
-	etc/jenkins/deployDEB.sh \
-	etc/jenkins/build.sh \
-	etc/jenkins/check.sh \
-	etc/jenkins/configure.sh \
-	etc/jenkins/clean.sh \
-	etc/jenkins/build_PETSc.sh \
 	etc/ff/ff.xcodeproj \
 	etc/ff/ff.xcodeproj/project.pbxproj  \
 	readme/BUGS readme/HISTORY_BEFORE_2005 readme/README_MAC.md readme/TODO \
@@ -298,7 +291,8 @@ install-exec-local:: bin/script/PostInstall.sh FreeFEM-documentation.pdf bin/md2
 	cd idp; for i in *.idp; do \
 		if [ -f $$i ]; then $(INSTALL) -m 555 $$i "$(DESTDIR)$(ff_prefix_dir)/idp"; fi; done
 	test ! -s FreeFEM-documentation.pdf || $(INSTALL_DATA) FreeFEM-documentation.pdf "$(DESTDIR)$(pkgdatadir)" 	
-	test `uname` != Darwin || ( rm "$(DESTDIR)/usr/local/bin/FreeFem++-CoCoa"; $(INSTALL_SCRIPT) FreeFem++-CoCoa "$(DESTDIR)/usr/local/bin" )		
+#  not error if PB insall FreeFem++-CoCoa in /usr/local/bin/
+	-test `uname` != Darwin || ( rm "$(DESTDIR)/usr/local/bin/FreeFem++-CoCoa"; $(INSTALL_SCRIPT) FreeFem++-CoCoa "$(DESTDIR)/usr/local/bin" )		
 	test `uname` != Darwin || $(INSTALL_SCRIPT) FreeFem++-CoCoa "$(DESTDIR)${bindir}"
 #    need sudo ...	
 #winDssSSs	test `uname` != Darwin || echo "$(bindir)" > "$(DESTDIR)/etc/paths.d/FreeFem++"

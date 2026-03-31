@@ -2,7 +2,6 @@
 // NBPROC 4
 
 load "PETSc-complex"                // PETSc plugin
-macro dimension()2// EOM            // 2D or 3D
 include "macro_ddm.idp"             // additional DDM functions
 
 macro grad(u)[dx(u), dy(u)]// EOM   // two-dimensional gradient
@@ -25,7 +24,8 @@ func real wedge(real a, real b) {
         return 3;
 }
 real omega = 2 * pi * 5;
-func f = 80 * 100 * s * exp(-20 * 100 * s * ((x-0.5)^2 + (y-0.25)^2));
+real xi = 0, yi = 0;
+func f = 80 * 100 * s * exp(-20 * 100 * s * ((x-0.5-xi)^2 + (y-0.25-yi)^2));
 complex[int] rhs(Wh.ndof);                  // local right-hand side
 matrix<complex> Loc;                        // local operator
 {                                           // local weak form
@@ -48,3 +48,28 @@ u[] = A^-1 * rhs;
 
 macro def(u)u//
 plotMPI(Th, u, Pk, def, complex, cmm = "Global solution");
+
+int M = 4;
+complex[int, int] RHS(rhs.n, M);
+RHS(:, 0) = rhs;
+for(int i = 1; i < M; ++i) {
+    xi += 0.1;
+    yi += 0.1;
+    varf vPb(u, v) = int2d(Th)(f * v) + on(1, u = 0.0);
+    RHS(:, i) = vPb(0, Wh, tgv = -1);
+}
+set(A, sparams = "-ksp_type hpddm -ksp_converged_reason -ksp_hpddm_type bgmres");
+complex[int, int] B = A^-1 * RHS;
+for(int i = 0; i < M; ++i) {
+    u[] = B(:, i);
+    macro params()cmm = "Global solution #" + i, wait = 1, fill = 1, value = 1, dim = 3//
+    plotMPI(Th, u, Pk, def, complex, params);
+}
+complex[int] C(B.n * B.m);
+C = A^-1 * RHS.asarray;
+for(int i = 0; i < M; ++i) {
+    u[] = B(:, i);
+    u[] -= C(i * Wh.ndof:(i + 1) * Wh.ndof - 1);
+    macro params()cmm = "Error #" + i, wait = 1, fill = 1, value = 1, dim = 3//
+    plotMPI(Th, u, Pk, def, complex, params);
+}

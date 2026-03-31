@@ -1,0 +1,174 @@
+# Full version of FreeFem, using Microsoft MS-MPI
+name: Full version MS-MPI
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+
+  pull_request:
+    branches:
+      - develop
+
+  workflow_call:
+    inputs:
+      release_version:
+        description: 'Release version number'
+        required: false
+        type: string
+      build_types:
+        description: 'Build types as JSON array'
+        required: true
+        type: string
+      windows_versions:
+        description: 'Windows versions as JSON array'
+        required: true
+        type: string
+      skip_check:
+        required: false
+        type: boolean
+        default: false
+      upload_build_artifacts:
+        required: false
+        type: boolean
+        default: false
+
+# For development phase
+  workflow_dispatch:
+
+# Hardcode workflow name since github.workflow is inherited from the caller.
+concurrency:
+  group: MS-MPI-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        version:  ${{ fromJson(inputs.windows_versions  || '[2025]') }}
+        build-type: ${{ fromJson(inputs.build-types  || '["release"]') }}
+
+    name: Windows Server ${{ matrix.version }} ${{ matrix.build-type }} - ${{github.workflow}}
+    runs-on: windows-${{ matrix.version }}
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Setup MPI
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: msmpi
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-freeglut
+            make
+            m4
+            patch
+            git
+            flex
+            bison
+            unzip
+            mingw-w64-x86_64-gcc-fortran
+            mingw-w64-x86_64-openblas
+            autoconf
+            automake-wrapper
+            pkg-config
+            pkgfile
+            tar
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-msmpi
+            python
+
+      # Otherwise PETSc doesn't know which python to use and returns error at
+      # configure
+      - name: Remove packages
+        run: |
+          pacman -R --noconfirm mingw-w64-x86_64-python mingw-w64-x86_64-gdb \
+          mingw-w64-x86_64-gdb-multiarch
+
+      - uses: actions/checkout@v6
+
+      - name: Set configure flags and variables
+        id: flags
+        run: |
+          if [ "${{ matrix.build-type }}" = "debug" ]; then
+            echo "configure-flags=--enable-debug" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.build-type }}" = "release" ]; then
+            echo "configure-flags=--enable-optim --enable-generic" >> $GITHUB_OUTPUT
+          fi
+
+      - name: CPU info
+        shell: pwsh
+        run: systeminfo
+
+      - name: Extract PETSc and runner info
+        id: petsc-info
+        run: |
+          VERSION=$(grep -E -o "petsc-([0-9]{1,}\.)+[0-9]{1,}" 3rdparty/getall | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "image=$ImageOS" >> $GITHUB_OUTPUT
+          # Convert MSYS2 path to Windows path
+          echo "win_home=$(cygpath -w "$HOME")" >> $GITHUB_OUTPUT
+
+      - name: Cache PETSc installation
+        id: cache-petsc
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{ steps.petsc-info.outputs.win_home }}/freefem/ff-petsc
+          key: "petsc-Full version MS-MPI-${{ steps.petsc-info.outputs.image }}-${{ matrix.cfg.opts }}-${{ steps.petsc-info.outputs.version }}-${{ hashFiles('3rdparty/ff-petsc/Makefile') }}"
+
+      - name: Configure
+        run: |
+          autoreconf -i
+          ./configure ${{ steps.flags.outputs.configure-flags }} --enable-download \
+          --enable-maintainer-mode --prefix="${HOME}/freefem"
+          ./3rdparty/getall -a -o PETSc
+
+      - name: PETSc
+        if: steps.cache-petsc.outputs.cache-hit != 'true'
+        run: |
+          ./3rdparty/getall -a -o PETSc
+          cd 3rdparty/ff-petsc
+          make petsc-slepc
+          cd -
+          ./reconfigure
+
+      - name: Upload PETSc and reconfigure logs on fail
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: PETSc-reconfigure-logs
+          path: |
+            3rdparty/ff-petsc/petsc-*/configure.log
+            config.log
+          compression-level: 9
+
+      - name: Build
+        run: make -j 4
+
+      - name: Check
+        if: ${{ inputs.skip_check == false }}
+        run: |
+          make check -i
+          ./etc/actions/failed_tests_logs.sh
+
+      - name: Package .exe
+        if: ${{ inputs.upload_build_artifacts == true }}
+        run: make win32
+
+      - name: Upload .exe
+        if: ${{ inputs.upload_build_artifacts == true }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: v${{ inputs.release_version }}-Windows-${{ matrix.windows_version }}
+          path: Output/*.exe
+          retention-days: 1

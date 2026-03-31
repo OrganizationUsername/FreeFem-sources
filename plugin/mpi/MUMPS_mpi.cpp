@@ -28,7 +28,19 @@
 // F. Hecht  december 2011
 // ----------------------------
 // file to add MUMPS sequentiel interface for sparce linear solver with dynamic load.
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
 #include <mpi.h>
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic pop
+#endif
 #ifdef _WIN32
 __declspec(dllexport) int toto;
 MPI_Fint* _imp__MPI_F_STATUS_IGNORE;
@@ -58,7 +70,7 @@ template<> struct MUMPS_STRUC_TRAIT<Complex>  {typedef ZMUMPS_STRUC_C MUMPS; typ
 void mumps_c(DMUMPS_STRUC_C *id) { dmumps_c(id);}
 void mumps_c(ZMUMPS_STRUC_C *id) { zmumps_c(id);}
 
-template<class T> struct MPI_TYPE {static MPI_Datatype  TYPE(){return MPI_BYTE;}};;
+template<class T> struct MPI_TYPE {static MPI_Datatype  TYPE(){return MPI_BYTE;}};
 template<> struct MPI_TYPE<long>      {static MPI_Datatype  TYPE(){return MPI_LONG;}};
 template<> struct MPI_TYPE<int>      {static MPI_Datatype TYPE(){return MPI_INT;}};
 template<> struct MPI_TYPE<double>    {static MPI_Datatype TYPE(){return MPI_DOUBLE;}};
@@ -127,13 +139,13 @@ public:
         delete [] id.jcn_loc;
         delete [] id.a_loc;
 
-        id.irn_loc = 0;
-        id.jcn_loc = 0;
-        id.a_loc = 0;
+        id.irn_loc = nullptr;
+        id.jcn_loc = nullptr;
+        id.a_loc = nullptr;
 
-        id.irn=0;
-        id.jcn=0;
-        id.a =0;
+        id.irn=nullptr;
+        id.jcn=nullptr;
+        id.a =nullptr;
     }
     void to_mumps_mat()
     {
@@ -172,9 +184,9 @@ public:
                 else
                 { //  no matrix
                     id.nz=0;
-                    id.a =0;
-                    id.irn = 0;;
-                    id.jcn = 0;
+                    id.a =nullptr;
+                    id.irn = nullptr;
+                    id.jcn = nullptr;
                     
                 }
                 
@@ -187,7 +199,7 @@ public:
                 id.a_loc = (MR *)(void *)a;
                 
             }
-            id.rhs = 0;
+            id.rhs = nullptr;
             ffassert( A.half == id.sym );//
             ICNTL(5) = 0;    // input matrix type
             ICNTL(7) = 7;    // NUMBERING ...
@@ -255,7 +267,7 @@ public:
             }
         }
     }
-    SolveMUMPS_mpi (HMat  &AA, const Data_Sparse_Solver & ds,Stack stack )
+    SolveMUMPS_mpi (HMat  &AA, const Data_Sparse_Solver & ds,Stack )
     : A(AA), verb(ds.verb),
     eps(ds.epsilon),
     tgv(ds.tgv),cn(0),cs(0),
@@ -274,9 +286,9 @@ public:
         int myid = 0;
         MPI_Comm_rank(MPI_COMM_WORLD, &myid);
         
-        id.irn=0;
-        id.jcn=0;
-        id.a =0;
+        id.irn=nullptr;
+        id.jcn=nullptr;
+        id.a =nullptr;
         
         id.job = JOB_INIT;
         id.par = 1;
@@ -323,10 +335,20 @@ public:
             MPI_Reduce( (void *) b,(void *)  x  , nN , MPI_TYPE<R>::TYPE(),MPI_SUM,0,comm);
         }
         else if(mpirank==0)  std::copy(b,b+nN,x);
+
+        if (trans && is_same<R,Complex>::value) // for tA x = b MUMPS does not conjugate, so we conjugate b and x
+        for (int k = 0; k < nN; ++k)
+            x[k] = RNM::conj(x[k]);
+
         id.rhs = (MR *)(void *)(R *)x;
         id.job = JOB_SOLVE;    // performs the analysis. and performs the factorization.
         SetVerb();
         mumps_c(&id);
+
+        if (trans && is_same<R,Complex>::value) // for tA x = b MUMPS does not conjugate, so we conjugate b and x
+        for (int k = 0; k < nN; ++k)
+            x[k] = RNM::conj(x[k]);
+
         Check("MUMPS_mpi dosolver");
         if(distributed) // send the solution ...
             MPI_Bcast(reinterpret_cast<void*> (x),nN, MPI_TYPE<R>::TYPE(), 0,comm);

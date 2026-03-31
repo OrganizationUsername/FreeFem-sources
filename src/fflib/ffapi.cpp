@@ -55,7 +55,19 @@
 #endif
 #ifndef FFLANG
 #ifdef PARALLELE
-#include "mpi.h"
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
+#include <mpi.h>
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic pop
+#endif
 #endif
 #endif
 
@@ -122,7 +134,7 @@ static  void ffapi_newplot(){}
 
     // need #include <cstdio>
       FILE *f= popen(command,type);
-      if( f!=0) {
+      if( f!=nullptr) {
 //     ne marche pas car ffglut plante si flux  vide  
 //          int ppok=pclose(f);
 //	f =0;
@@ -131,7 +143,7 @@ static  void ffapi_newplot(){}
 //	else
 //	  std::cerr << " fopen ok but plose bug ! =" << ppok <<  "\n";
       }
-      if( f==0) { 
+      if( f==nullptr) { 
 	std::cerr << "Error: popen " << f << " " << command << " " << type << std::endl;
 	exit(1); }
 
@@ -236,7 +248,11 @@ static  int ffapi_ff_feof(FILE *stream){
 #endif
   }
 
-static  void ffapi_wintextmode(FILE *f){
+static  void ffapi_wintextmode(FILE *
+#ifdef _WIN32
+                               f
+#endif
+                               ){
 #ifndef FFLANG
 #ifdef _WIN32
     // need #include <fcntl.h>
@@ -245,7 +261,11 @@ static  void ffapi_wintextmode(FILE *f){
 #endif
   }
 
-static  void ffapi_winbinmode(FILE *f){
+static  void ffapi_winbinmode(FILE *
+#ifdef _WIN32
+                              f
+#endif
+                              ){
 #ifndef FFLANG
 #ifdef _WIN32
     _setmode(fileno(f),O_BINARY);	

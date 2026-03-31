@@ -2419,9 +2419,7 @@ AnyType ConvexHull3D_tetg_file_Op::operator( )(Stack stack) const {
   strncpy(switch_tetgen, switch_tet->c_str( ), size_switch_tet);
   //= =====================================
 
-  Mesh3 *Th3 = new Mesh3;
-
-  Th3 = Convexhull_3Dpoints(switch_tetgen, nbv, cxx, cyy, czz, label_tet, label_face);
+  Mesh3 *Th3 = Convexhull_3Dpoints(switch_tetgen, nbv, cxx, cyy, czz, label_tet, label_face);
 
   Th3->BuildGTree( );
   Add2StackOfPtr2FreeRC(stack, Th3);

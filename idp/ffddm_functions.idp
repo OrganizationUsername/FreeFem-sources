@@ -92,19 +92,20 @@ func preffe#K[int] pr#directsolve(preffe#K[int]& rhs)
       res = pr#Aglobal^-1*rhs;
     }
     else if (!preffe#prmesh#excluded) {
-      matrix<preffe#K> matloc;
-      if (preffe#prmesh#overlap > 0) {
-        matloc = preffe#Dih[mpiRank(preffe#prmesh#commddm)]*pr#aRd[mpiRank(preffe#prmesh#commddm)];
-        matloc = preffe#Rih[mpiRank(preffe#prmesh#commddm)]'*matloc;
+      if (pr#matdirect.n == 1) {
+        if (preffe#prmesh#overlap > 0) {
+          pr#matdirect = preffe#Dih[mpiRank(preffe#prmesh#commddm)]*pr#aRd[mpiRank(preffe#prmesh#commddm)];
+          pr#matdirect = preffe#Rih[mpiRank(preffe#prmesh#commddm)]'*pr#matdirect;
+        }
+        else
+          pr#matdirect = preffe#Rih[mpiRank(preffe#prmesh#commddm)]'*pr#matN;
+        pr#matdirect = pr#matdirect*preffe#Rih[mpiRank(preffe#prmesh#commddm)];
+        set(pr#matdirect,solver = sparsesolver,commworld=preffe#prmesh#commddm,master=-1);
       }
-      else
-        matloc = preffe#Rih[mpiRank(preffe#prmesh#commddm)]'*pr#matN;
-      matloc = matloc*preffe#Rih[mpiRank(preffe#prmesh#commddm)];
-      set(matloc,solver = sparsesolver,commworld=preffe#prmesh#commddm,master=-1);
       preffe#K[int] scaledrhs = preffe#Dih[mpiRank(preffe#prmesh#commddm)]*rhs;
       preffe#K[int] scaledrhsg(preffe#Vhglob.ndof);
       scaledrhsg = preffe#Rih[mpiRank(preffe#prmesh#commddm)]'*scaledrhs;
-      preffe#K[int] resg = matloc^-1*scaledrhsg;
+      preffe#K[int] resg = pr#matdirect^-1*scaledrhsg;
       res = preffe#Rih[mpiRank(preffe#prmesh#commddm)]*resg;
     }
   }
@@ -144,6 +145,10 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
     return res;
   }   
 
+  IFMACRO (pr#myQ)
+  pr#myQ
+  ENDIFMACRO
+  IFMACRO (!pr#myQ)
   func preffe#K[int] pr#Q(preffe#K[int] &l, int mrhs)      /* Q = Z*E^-1*Z^T */
   {
     preffe#K[int] res(l.n);
@@ -229,7 +234,7 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
       }
       else{
         
-        preffe#K[int] vaux(pr#ncoarsespace), zaux(pr#ncoarsespace);
+        preffe#K[int] vaux(pr#ncoarsespace), zaux(pr#ncoarsespace), zauxg(pr#sg);
         
         /* Z^T l */
         if (!bpara) {
@@ -242,6 +247,10 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
               cpt++;
             }
           }
+          /* global deflation vectors */
+          for (int jj=0; jj<pr#sg; jj++)
+            vaux[cpt]=pr#Z[cpt++]'*l;
+
           zaux=pr#E^-1*vaux;
           cpt = 0;
           /* the 2 fors loop over the columns of Z subdomainwise */
@@ -253,6 +262,9 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
             cpt++; /* keeps track of the global numbering of the columns of Z */
             /* we multiply 'column by element' */
           }
+          /* global deflation vectors */
+          for (int jj=0; jj<pr#sg; jj++)
+            res += zaux[cpt]*pr#Z[cpt++];
         }
         else {
           preffe#K[int] tmp(pr#si);
@@ -266,8 +278,12 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
               preffe#prmesh#toccomm(pr#tcsi,"",pr#tcs,preffe#prmesh#commCS)
             ENDIFMACRO
             IFMACRO(!pr#CSwithpetsc)
-            mpiGatherv(tmp,vaux,processor(0,preffe#prmesh#mpicomm),pr#sizelgworld,pr#offsetiworld);
+            if (pr#ncoarsespace > pr#sg)
+              mpiGatherv(tmp,vaux(0:pr#ncoarsespace-pr#sg-1),processor(0,preffe#prmesh#mpicomm),pr#sizelgworld,pr#offsetiworld);
             /* mpiGatherv puts together inside vaux the local vectors (whose sizes are in sizelg) */
+            for (int ii=0; ii < pr#sg; ii++)
+              vaux[pr#ncoarsespace-pr#sg+ii] = pr#prfe#scalprod(pr#Z[ii+pr#si], l);
+
             if (mpiRank(preffe#prmesh#mpicomm) < preffe#prmesh#pCS) {
               preffe#prmesh#tic(pr#tcsi)
               if (mpiRank(preffe#prmesh#mpicomm) == 0)
@@ -278,7 +294,15 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
               }
               preffe#prmesh#toccomm(pr#tcsi,"",pr#tcs,preffe#prmesh#commCS)
             }
-            mpiScatterv(zaux,tmp,processor(0,preffe#prmesh#mpicomm),pr#sizelgworld,pr#offsetiworld);
+            if (pr#ncoarsespace > pr#sg)
+              mpiScatterv(zaux(0:pr#ncoarsespace-pr#sg-1),tmp,processor(0,preffe#prmesh#mpicomm),pr#sizelgworld,pr#offsetiworld);
+
+            if (pr#sg > 0) {
+              if (mpiRank(preffe#prmesh#mpicomm) == 0)
+                zauxg = zaux(pr#ncoarsespace-pr#sg:pr#ncoarsespace-1);
+              broadcast(processor(0,preffe#prmesh#mpicomm),zauxg);
+            }
+
             ENDIFMACRO
             /* inverse of mpiGatherv, cut the global zaux into the local tmp[i] */
             for (int i=0;i<pr#si;i++) {
@@ -368,11 +392,16 @@ macro ffddmgeneratePrecondfunctions(pr,preffe)
             ;
           }
           pr#prfe#update(res,false); /* recover the Z_j zaux_j (in the overlap) computed by neighbouring subdomains */
+
+          if (!pr#prfe#prmesh#excluded)
+          for (int i=0;i<pr#sg;i++)
+            res += zauxg[i]*pr#Z[pr#si+i];
         }
       }
     }
     return res;
-}
+  }
+  ENDIFMACRO
 
 func preffe#K[int] pr#Q(preffe#K[int] &l)      /* Q = Z*E^-1*Z^T */
 {
@@ -399,6 +428,7 @@ func preffe#K[int] pr#PREC1(preffe#K[int] &l, int mrhs)
       s = l;
     }
     else {
+      IFMACRO(!pr#superwithchunk)
       if (!bpara) {
         assert(mrhs == 1);
         for(int i=0; i<preffe#prmesh#npart; ++i)  {
@@ -413,12 +443,28 @@ func preffe#K[int] pr#PREC1(preffe#K[int] &l, int mrhs)
         }
       }
       else if (!preffe#prmesh#excluded){
-        preffe#K[int] aux = l;
+        preffe#K[int] aux(mrhs*pr#aR[mpiRank(preffe#prmesh#commddm)].n);
+        /* for bem, the local HMatrix is defined on the Augmented mesh, so we need to extend -> solve -> restrict */
+        if (pr#aR[mpiRank(preffe#prmesh#commddm)].n == preffe#Auginterp.m) {
+          for (int m=0; m<mrhs; m++)
+            aux(m*preffe#Auginterp.m:(m+1)*preffe#Auginterp.m-1) = preffe#Auginterp'*l(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1);
+        }
+        else
+          aux = l;
+
         if(pr#prec == "soras")
         for (int m=0; m<mrhs; m++)
           aux(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1) = aux(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1) .* preffe#Dk[mpiRank(preffe#prmesh#commddm)];
-        /* s = aR[mpirank]^-1 * l; */
-        s = pr#aR[mpiRank(preffe#prmesh#commddm)]^-1 * aux;
+
+        /* for bem, the local HMatrix is defined on the Augmented mesh, so we need to extend -> solve -> restrict */
+        if (pr#aR[mpiRank(preffe#prmesh#commddm)].n == preffe#Auginterp.m) {
+          preffe#K[int] saug = pr#aR[mpiRank(preffe#prmesh#commddm)]^-1 * aux;
+          for (int m=0; m<mrhs; m++)
+            s(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1) = preffe#Auginterp*saug(m*preffe#Auginterp.m:(m+1)*preffe#Auginterp.m-1);
+        }
+        else
+          s = pr#aR[mpiRank(preffe#prmesh#commddm)]^-1 * aux;
+
         if(pr#prec != "asm"){
           for (int m=0; m<mrhs; m++)
             pr#prfe#update(s(m*preffe#Vhi.ndof:(m+1)*preffe#Vhi.ndof-1),true);
@@ -430,6 +476,34 @@ func preffe#K[int] pr#PREC1(preffe#K[int] &l, int mrhs)
           }
         }       
       }
+      ENDIFMACRO
+      IFMACRO(pr#superwithchunk)
+      preffe#K[int] chunkl(pr#superchunkinterp.m);
+      if(pr#prec == "soras") {
+        preffe#K[int] lD = l .* pr#chunksuperDk;
+        chunkl = pr#superchunkinterp'*lD;
+      }
+      else
+        chunkl = pr#superchunkinterp'*l;
+
+      pr#chunkupdate(chunkl,true);
+
+      preffe#K[int] chunku(chunkl.n);
+      chunku = 0;
+
+      chunku = pr#chunkfGMRES(chunku, chunkl, ffddmtol, ffddmmaxit, ffddmvariant);
+      /* chunku = pr#chunkdirectsolve(chunkl); */
+
+      chunku = chunku .* pr#chunkDk[mpiRank(pr#chunkcommddm)];
+
+      preffe#K[int] s = pr#superchunkinterp*chunku;
+
+      if(pr#prec != "asm")
+        s = s .* pr#chunksuperDk;
+
+      pr#prfe#update(s,false);
+      return s;
+      ENDIFMACRO
     }
     preffe#prmesh#toc(pr#tpreci,"",pr#tprec)
   }
@@ -439,10 +513,12 @@ func preffe#K[int] pr#PREC1(preffe#K[int] &l, int mrhs)
 func preffe#K[int] pr#PREC1(preffe#K[int] &l)
 {
   int mrhs = 1;
-  if (preffe#prmesh#isincomm) {
+  if (preffe#prmesh#isincomm && !preffe#prmesh#excluded) {
     int ndof = bpara ? preffe#Dk[mpiRank(preffe#prmesh#commddm)].n : preffe#Vhglob.ndof;
-    assert(l.n%ndof == 0);
-    mrhs = l.n/ndof;
+    if (l.n > 0) {
+      assert(l.n%ndof == 0);
+      mrhs = l.n/ndof;
+    }
   }
   return pr#PREC1(l, mrhs);
 }
@@ -583,7 +659,9 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
 {	
   if (preffe#prmesh#isincomm) {
     preffe#prmesh#tic(pr#tgmresi)
-    
+
+    string prefix = Stringification(pr)+"_";
+
     preffe#K[int] uni(x0.n);
     
     int dim = min(maxit,ffddmrestart);
@@ -592,16 +670,15 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
     load "hpddm"
     if (!preffe#prmesh#excluded) {
       uni = x0;
-      IterativeMethod(pr#A, rhs,uni, precon = pr#PREC, sparams = "-hpddm_tol "+eps+" -hpddm_variant "+(preffe#prmesh#binexactCS ? "flexible" : sprec)+" -hpddm_gmres_restart "+dim+" -hpddm_max_it "+maxit+(mpirank == 0 ? " -hpddm_verbosity "+pr#verbosity : "")+" -hpddm_orthogonalization mgs",communicator = preffe#prmesh#mpicomm);
+      pr#nbiter = IterativeMethod(pr#A, rhs,uni, precon = pr#PREC, sparams = "-hpddm_tol "+eps+" -hpddm_variant "+(preffe#prmesh#binexactCS ? "flexible" : sprec)+" -hpddm_gmres_restart "+dim+" -hpddm_max_it "+maxit+(mpirank == 0 ? " -hpddm_verbosity "+pr#verbosity : "")+" -hpddm_orthogonalization mgs",communicator = preffe#prmesh#mpicomm);
     }
     else
-    IterativeMethod(pr#A, uni,uni, precon = pr#PREC, sparams = "-hpddm_tol "+eps+" -hpddm_variant "+(preffe#prmesh#binexactCS ? "flexible" : sprec)+" -hpddm_gmres_restart "+dim+" -hpddm_max_it "+maxit+(mpirank == 0 ? " -hpddm_verbosity "+pr#verbosity : "")+" -hpddm_orthogonalization mgs",communicator = preffe#prmesh#mpicomm);
+      pr#nbiter = IterativeMethod(pr#A, uni,uni, precon = pr#PREC, sparams = "-hpddm_tol "+eps+" -hpddm_variant "+(preffe#prmesh#binexactCS ? "flexible" : sprec)+" -hpddm_gmres_restart "+dim+" -hpddm_max_it "+maxit+(mpirank == 0 ? " -hpddm_verbosity "+pr#verbosity : "")+" -hpddm_orthogonalization mgs",communicator = preffe#prmesh#mpicomm);
     ENDIFMACRO
     
     IFMACRO(pr#withhpddm)
     uni = x0;
     real[int] timings(1);
-    string prefix = Stringification(pr)+"_";
     set(pr#hpddmOP, sparams = "-hpddm_"+prefix+"schwarz_method "+pr#prec+" -hpddm_"+prefix+"tol "+eps+" -hpddm_"+prefix+"variant "+(preffe#prmesh#binexactCS ? "flexible" : sprec)+" -hpddm_"+prefix+"gmres_restart "+dim+" -hpddm_"+prefix+"max_it "+maxit+" -hpddm_"+prefix+"verbosity "+pr#verbosity+" -hpddm_"+prefix+"orthogonalization mgs", prefix=prefix);
     if (pr#corr == "AD")
       set(pr#hpddmOP, sparams = "-hpddm_"+prefix+"schwarz_coarse_correction additive", prefix=prefix);
@@ -628,7 +705,31 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
     uni = pr#petscOP^-1*rhs;
     ENDIFMACRO
 
-    IFMACRO((!pr#withhpddm)&(!pr#withhpddmkrylov)&(!pr#withpetsc))
+    IFMACRO(pr#withpetscksp)
+    preffe#K[int] lff(x0.n), resff(x0.n), respetsc(pr#petscOP.n);
+    func preffe#K[int] pr#petscA(preffe#K[int] &l){
+      ChangeNumbering(pr#petscOP, lff, l, inverse=true, exchange=true); /* petsc -> ffddm numbering */
+      resff = pr#A(lff);
+      ChangeNumbering(pr#petscOP, resff, respetsc); /* ffddm -> petsc numbering */
+      return respetsc;
+    }
+
+    func preffe#K[int] pr#petscPREC(preffe#K[int] &l){
+      ChangeNumbering(pr#petscOP, lff, l, inverse=true, exchange=true); /* petsc -> ffddm numbering */
+      resff = pr#PREC(lff);
+      ChangeNumbering(pr#petscOP, resff, respetsc); /* ffddm -> petsc numbering */
+      return respetsc;
+    }
+
+    Mat<preffe#K> tmpmat(pr#petscOP, pr#petscA);
+    pr#petsckspOP = tmpmat;
+    set(pr#petsckspOP, precon=pr#petscPREC, sparams = "-prefix_push "+prefix+" -ksp_rtol "+eps+" -ksp_pc_side "+sprec+ " -ksp_gmres_restart "+dim+" -ksp_max_it "+maxit+ (pr#verbosity >= 3 ? " -ksp_monitor_true_residual":"") + " -prefix_pop",prefix = prefix);
+
+    uni = x0;
+    uni = pr#petsckspOP^-1*rhs;
+    ENDIFMACRO
+
+    IFMACRO((!pr#withhpddm)&(!pr#withhpddmkrylov)&(!pr#withpetsc)&(!pr#withpetscksp))
     preffe#K[int,int] Hn(dim+2,dim+1);     /* Hessenberg matrix */
     Hn = 0.;
 
@@ -673,6 +774,7 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
     real relres = 0;
     
     pr#nbiter = 1;
+    pr#reshistory.resize(maxit);
     
     x0i = x0;
     
@@ -832,6 +934,7 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
           ;
         }
 
+        pr#reshistory[pr#nbiter-1] = relres/normb;
         if(relres/normb < abs(eps)) {
           if (pr#verbosity && (mpiRank(preffe#prmesh#mpicomm)==0)) {
             cout << "["+Stringification(pr)+"] GMRES has converged in " + (pr#nbiter) + " iterations " << endl;
@@ -856,6 +959,7 @@ func preffe#K[int] pr#fGMRES(preffe#K[int]& x0, preffe#K[int]& rhs, real eps, in
       cout << "["+Stringification(pr)+"] The relative residual is " +  relres/normb << endl;
     }
     ENDIFMACRO
+    pr#reshistory.resize(min(maxit,pr#nbiter));
     preffe#prmesh#toc(pr#tgmresi,"",pr#tgmres)
     return uni;
   }

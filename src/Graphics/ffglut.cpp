@@ -67,6 +67,7 @@ double gwait=0;//  no wait in second
 #include "ffthreads.hpp"
 
 int version =0;
+int subversion =0;
 
 Thread::Id tidRead=0;
 bool NoMorePlot=false;
@@ -3110,15 +3111,8 @@ case 20+index: {type dummy; fin >= dummy;} break;
     PmaxT=Pmax;
     fminT=fmin;
     fmaxT=fmax;
-    if(old && 0)
-    {
-        Pmin= Minc(Pmin,old->PminT);
-        Pmax= Maxc(Pmax,old->PmaxT);
-        fmax= Max(fmax,old->fmaxT);
-        fmin= Min(fmin,old->fminT);
-    }
 
-    z0= fminT +(fmaxT-fminT)*0.01;
+    z0= fminT -(fmaxT-fminT)*0.01;
     if((debug > 2)) cout << "               data bound: " << PminT << " " << PmaxT
         << " fmin == " << fminT << "  " << fmaxT
         << " z0 " << z0 <<  endl;
@@ -3239,7 +3233,7 @@ void OneWindow::PlotValue(const KN_<double> & Viso,int  k0,const char * cmm)
     R dx=(xmax-xmin);
     R dy=(ymax-ymin);
     //  10 points
-    R h=10*kscreenscale;
+    R h=14*kscreenscale;
     if( kscreenscale==2) h = 24;// BofBof F.H
     R ho=h*1.1;
     R x0=xmin+dx*0.85;
@@ -3252,14 +3246,14 @@ void OneWindow::PlotValue(const KN_<double> & Viso,int  k0,const char * cmm)
     this->color(1);
 
     plot(x0+ho,y,cmm);
-    y -=  ho;
+    y -=  ho*2;
     for (int i=0;i<Viso.N();i++)
     {
         if((debug > 10)) cout << " x0 : " << x0<< " " << y << " " << h << " v = " << Viso[i] << endl;
         this->color(i+4);
         FillRectRasterPos(x0,y,x0+h,y+h);
         plot(x0+ho,y+3*h/10,Viso[i]);
-        y -=  ho;
+        y -=  h;
         ;
     }
     ShowGlerror("PlotValue f");
@@ -3482,7 +3476,7 @@ void ThePlot::DrawIsoTfill(const R2 Pt[3],const R ff[3],const R * Viso,int NbIso
                     R  xlam=(fi-xf)/(fi-fj);
                     z[im] =  ff[i] * (1.F-xlam)  +  ff[j]* xlam;
                     PQ[im++]   = Pt[i] * (1.F-xlam)  +  Pt[j]* xlam;
-
+                    if(verbosity>999) cout << im-1 << " PQ " << PQ[im-1] << endl;
                 }
             }
             xf = xxfh;

@@ -377,7 +377,7 @@ void PvtuWriter(string*& pffname, const int size, const int time, const string b
 //--------------------------------------------------------------------------------//
 // A function to output a .pvd file for ParaView usage when PETSc or HPDDM is used
 //--------------------------------------------------------------------------------//
-void PvdWriter(string*& pffname, const int size, const int time, const string base_filename, const string CellDataArrayForPvtu, const string PointDataArrayForPvtu) {
+void PvdWriter(string*& pffname, const int size, const int time, const string base_filename, const string, const string) {
   std::ostringstream marker;
   marker << std::setw(to_string(size).length()) << std::setfill('0') << "0";
   std::string zero;
@@ -462,7 +462,7 @@ void writebin64flush(FILE *fp) {
   fwrite(&ElementChars, l, 1, fp);
 }
 
-void VTU_WRITE_MESH(FILE *fp, const Mesh &Th, bool binary, int datasize, bool surface) {
+void VTU_WRITE_MESH(FILE *fp, const Mesh &Th, bool binary, int, bool surface) {
   int nc, nv, nconnex;
 
   if (surface) {
@@ -756,7 +756,7 @@ void VTU_WRITE_MESH(FILE *fp, const Mesh &Th, bool binary, int datasize, bool su
   //---------------------------------- LABELS WITH VTU -------------------------------------------//
 }
 
-void VTU_WRITE_MESH(FILE *fp, const Mesh3 &Th, bool binary, int datasize, bool surface) {
+void VTU_WRITE_MESH(FILE *fp, const Mesh3 &Th, bool binary, int, bool surface) {
   int nc, nv, nconnex;
 
   if (surface) {
@@ -1063,7 +1063,7 @@ void VTU_WRITE_MESH(FILE *fp, const Mesh3 &Th, bool binary, int datasize, bool s
 }
 
 template< class MMesh >
-void VTU_WRITE_MESHT(FILE *fp, const MMesh &Th, bool binary, int datasize, bool surface) {
+void VTU_WRITE_MESHT(FILE *fp, const MMesh &Th, bool binary, int, bool surface) {
   typedef typename MMesh::Element T;
   typedef typename MMesh::BorderElement B;
 
@@ -1385,7 +1385,7 @@ class VTK_LoadMesh_Op : public E_F0mps {
 basicAC_F0::name_and_type VTK_LoadMesh_Op::name_param[] = {{"reft", &typeid(long)},
                                                            {"swap", &typeid(bool)},
                                                            {"refe", &typeid(long)},
-                                                           {"namelabel", &typeid(string)},
+                                                           {"namelabel", &typeid(string*)},
                                                            {"fields", &typeid( KN<KN<double> >*)}};
 
 class VTK_LoadMesh : public OneOperator {
@@ -1413,7 +1413,7 @@ Mesh *VTK_Load(const string &filename, bool bigEndian, KN<KN<double> >* pfields)
     exit(1);
   }
 
-  char buffer[256], buffer2[256];
+  char buffer[256], buffer2[256], buffer3[256];
 
   res = fgets(buffer, sizeof(buffer), fp);    // version line
   res = fgets(buffer, sizeof(buffer), fp);    // title
@@ -1528,6 +1528,8 @@ Mesh *VTK_Load(const string &filename, bool bigEndian, KN<KN<double> >* pfields)
   int *firstCell = new int[numElements + 1];
   int *TypeCells = new int[numElements];
   int numIntCells = 0;
+  bool loadlabs = 0;
+  int *LabCells = nullptr;
 
   for (unsigned int i = 0; i < numElements; i++) {
     int numVerts, n[100];
@@ -1639,6 +1641,75 @@ Mesh *VTK_Load(const string &filename, bool bigEndian, KN<KN<double> >* pfields)
     }
   }
 
+  int nbp=0,nbf=0, err=0;
+  if (fscanf(fp, "%s %d", buffer, &nbp) != 2) {
+    cout << "error in reading vtk files pfields" << endl;
+    err++;
+  }
+  int startdatapoint=0;
+  if(err==0) {
+    int nf=-1;
+    /*
+    CELL_DATA 209726
+    Scalars  Label int 1
+    LOOKUP_TABLE FreeFempp_table
+    ....
+    LOOKUP_TABLE FreeFempp_table 7
+    4*7 value
+    */
+    if (strcmp(buffer, "CELL_DATA")) { // read region number if exist
+      if (strcmp(buffer, "POINT_DATA")) {
+        cout << "VTK reader can only read CELL_DATA or POINT_DATA datasets:  not " << buffer<< " " << nbp<<  endl;
+        err=1;
+      }
+      else startdatapoint=1;
+    }
+    else {
+      if ((!err) &&(fscanf(fp, "%s %s %s %d\n", buffer, buffer2,buffer3,&nbf) != 4)) {
+        cout << "error in reading vtk files FIELD FieldData" << endl;
+        err++;
+      }
+    }
+    loadlabs = !strcmp(buffer2, "Label");
+    if (loadlabs && err==0)
+      LabCells = new int[numElements];
+    if (strcmp(buffer3, "int") !=0) // not integer
+      err++;
+    if ((!err) &&(fscanf(fp, "%s %s\n", buffer, buffer2) != 2))
+      err++;
+    // read nbf
+    //cout << " err= " << err << " read nbp "<< nbp << endl;
+    if(err==0)
+      for( nf=0 ; nf < nbp; nf++) {
+        int ii[1];
+        if (binary) {
+          if (fread(ii, sizeof(int), 1, fp) != 1) err++;
+          if (!bigEndian) FreeFEM::SwapBytes((char *)&ii[0], sizeof(int), 1);
+        }
+        else {
+          if (fscanf(fp, "%d", ii) != 1) err++;
+        }
+        if (loadlabs)
+          LabCells[nf] = ii[0];
+        if(err) break;
+      }
+    if(err) cout << " err reading CELL_DATA  at " << nf << endl;
+    if ((!err) &&(fscanf(fp, "%s %s %d\n", buffer, buffer2,&nbf) != 3 ) ) err++;
+    nf =-1;
+    if(err==0)
+      for( nf=0 ; nf < nbf; nf++) {
+        float f[4];
+        char cc[4];
+        if (binary) {
+          if (fread(cc, sizeof(char), 4, fp) != 4) err++;}
+        else {
+          if (fscanf(fp, "%f %f %f %fa",f+0,f+1,f+2,f+3) != 4) err++;}
+        if(err) break;
+      }
+    if(err&& nf>=0) cout << " err LOOKUP_TABLE FreeFempp_table at " << nf << " " << err << endl;
+    startdatapoint=0;
+  }
+
   if(pfields) {
     if(verbosity>1)   cout << " try  reading POINT_DATA  " << endl;
          
@@ -1739,7 +1810,7 @@ Mesh *VTK_Load(const string &filename, bool bigEndian, KN<KN<double> >* pfields)
   for (unsigned int i = 0; i < numElements; i++) {
     int type = TypeCells[i];
     int iv[3];
-    int label = 1;
+    int label = loadlabs ? LabCells[i] : 1;
 
     switch (type) {
       case 1:    // Vertex
@@ -1776,8 +1847,13 @@ Mesh *VTK_Load(const string &filename, bool bigEndian, KN<KN<double> >* pfields)
   delete[] IntCells;
   delete[] firstCell;
   delete[] TypeCells;
+  if (loadlabs) delete[] LabCells;
 
   Mesh *pTh = new Mesh(nv, nt, nbe, vff, tff, bff);
+
+  R2 Pn,Px;
+  pTh->BoundingBox(Pn,Px);
+  pTh->quadtree=new Fem2D::FQuadTree(pTh,Pn,Px,pTh->nv);
   return pTh;
 }
 
@@ -1803,7 +1879,7 @@ AnyType VTK_LoadMesh_Op::operator( )(Stack stack) const {
   if (nargs[3]) {
     DataLabel = GetAny< string * >((*nargs[3])(stack));
   }
-  KN<KN<double> > * pfields=0;
+  KN<KN<double> > * pfields=nullptr;
   pfields=arg(4, stack,pfields);
   Mesh *Th = VTK_Load(*pffname, swap, pfields);
 
@@ -1829,12 +1905,12 @@ class VTK_WriteMesh_Op : public E_F0mps {
     long nbfloat;    // 1 scalar, 2 vector (3D), 3 symtensor(3D)
     Expression e[3];
     Expression2( ) {
-      e[0] = 0;
-      e[1] = 0;
-      e[2] = 0;
+      e[0] = nullptr;
+      e[1] = nullptr;
+      e[2] = nullptr;
       what = 0;
       nbfloat = 0;
-    };
+    }
     Expression &operator[](int i) { return e[i]; }
 
     double eval(int i, Stack stack) const {
@@ -2500,7 +2576,7 @@ void VTK_WRITE_MESH(const string &filename, FILE *fp, const Mesh &Th, bool binar
   fprintf(fp, "CELLS %d %d\n", numElements, totalNumInt);
 
   if (binary) {
-    int IntType = 3;
+    constexpr int IntType = 3;
     if (verbosity > 1) {
       printf("writing triangle elements \n");
     }
@@ -2527,7 +2603,7 @@ void VTK_WRITE_MESH(const string &filename, FILE *fp, const Mesh &Th, bool binar
         printf("writing edge elements \n");
       }
 
-      IntType = 2;
+      constexpr int IntType = 2;
 
       for (int ibe = 0; ibe < Th.neb; ibe++) {
         const Mesh::BorderElement &K(Th.be(ibe));
@@ -2546,7 +2622,7 @@ void VTK_WRITE_MESH(const string &filename, FILE *fp, const Mesh &Th, bool binar
       }
     }
   } else {
-    int IntType = 3;
+    constexpr int IntType = 3;
     if (verbosity > 1) {
       printf("writing triangle elements \n");
     }
@@ -2568,7 +2644,7 @@ void VTK_WRITE_MESH(const string &filename, FILE *fp, const Mesh &Th, bool binar
         printf("writing edge elements \n");
       }
 
-      IntType = 2;
+      constexpr int IntType = 2;
 
       for (int ibe = 0; ibe < Th.neb; ibe++) {
         const Mesh::BorderElement &K(Th.be(ibe));
@@ -2787,7 +2863,7 @@ AnyType VTK_WriteMesh_Op::operator( )(Stack stack) const {
   int nbofsol = l.size( );
   KN< int > order(nbofsol);
 
-  char *nameofuser[nbofsol];
+  std::vector<char *> nameofuser(nbofsol);
 
   for (int ii = 0; ii < nbofsol; ii++) {
     order[ii] = 0;
@@ -2825,7 +2901,7 @@ AnyType VTK_WriteMesh_Op::operator( )(Stack stack) const {
   string base_filename;
   std::string CellDataArrayForPvtu  = "";
   std::string PointDataArrayForPvtu = "";
-  parallelIO(pffname, nargs[7] ? (MPI_Comm *)GetAny< pcommworld >((*nargs[7])(stack)) : 0,
+  parallelIO(pffname, nargs[7] ? (MPI_Comm *)GetAny< pcommworld >((*nargs[7])(stack)) : nullptr,
              nargs[8] && GetAny< bool >((*nargs[8])(stack)), time, size, base_filename);
 #endif
 
@@ -3159,7 +3235,7 @@ class VTK_LoadMesh3_Op : public E_F0mps {
 
 basicAC_F0::name_and_type VTK_LoadMesh3_Op::name_param[] = {
   {"reftet", &typeid(long)},         {"swap", &typeid(bool)},
-  {"refface", &typeid(long)},        {"namelabel", &typeid(string)},
+  {"refface", &typeid(long)},        {"namelabel", &typeid(string*)},
   {"cleanmesh", &typeid(bool)},      {"removeduplicate", &typeid(bool)},
   {"precisvertice", &typeid(double)},
   {"fields", &typeid( KN<KN<double> >*)}
@@ -3697,7 +3773,7 @@ AnyType VTK_LoadMesh3_Op::operator( )(Stack stack) const {
   bool cleanmesh(arg(4, stack, false));
   bool removeduplicate(arg(5, stack, false));
   double precisvertice(arg(6, stack, 1e-6));
-    KN<KN<double> > * pfields=0;
+    KN<KN<double> > * pfields=nullptr;
     pfields=arg(7, stack,pfields);
   Mesh3 *Th = VTK_Load3(*pffname, swap, cleanmesh, removeduplicate, precisvertice,pfields);
 
@@ -3723,15 +3799,15 @@ class VTK_WriteMesh3_Op : public E_F0mps {
     long nbfloat;    // 1 scalar, 2 vector (3D), 3 symtensor(3D)
     Expression e[6];
     Expression2( ) {
-      e[0] = 0;
-      e[1] = 0;
-      e[2] = 0;
-      e[3] = 0;
-      e[4] = 0;
-      e[5] = 0;
+      e[0] = nullptr;
+      e[1] = nullptr;
+      e[2] = nullptr;
+      e[3] = nullptr;
+      e[4] = nullptr;
+      e[5] = nullptr;
       what = 0;
       nbfloat = 0;
-    };
+    }
     Expression &operator[](int i) { return e[i]; }
 
     double eval(int i, Stack stack) const {
@@ -4446,7 +4522,7 @@ void VTK_WRITE_MESH3(const string &filename, FILE *fp, const Mesh3 &Th, bool bin
   fprintf(fp, "CELLS %d %d\n", numElements, totalNumInt);
 
   if (binary) {
-    int IntType = 4;
+    constexpr int IntType = 4;
     if (verbosity > 1) {
       printf("writing tetrahedron elements \n");
     }
@@ -4473,7 +4549,7 @@ void VTK_WRITE_MESH3(const string &filename, FILE *fp, const Mesh3 &Th, bool bin
         printf("writing triangle elements \n");
       }
 
-      IntType = 3;
+      constexpr int IntType = 3;
 
       for (int ibe = 0; ibe < Th.nbe; ibe++) {
         const Triangle3 &K(Th.be(ibe));
@@ -4492,7 +4568,7 @@ void VTK_WRITE_MESH3(const string &filename, FILE *fp, const Mesh3 &Th, bool bin
       }
     }
   } else {
-    int IntType = 4;
+    constexpr int IntType = 4;
     if (verbosity > 1) {
       printf("writing tetrahedron elements \n");
     }
@@ -4514,7 +4590,7 @@ void VTK_WRITE_MESH3(const string &filename, FILE *fp, const Mesh3 &Th, bool bin
         printf("writing triangle elements \n");
       }
 
-      IntType = 3;
+      constexpr int IntType = 3;
 
       for (int ibe = 0; ibe < Th.nbe; ibe++) {
         const Triangle3 &K(Th.be(ibe));
@@ -4730,7 +4806,7 @@ AnyType VTK_WriteMesh3_Op::operator( )(Stack stack) const {
   int nbofsol = l.size( );
   KN< int > order(nbofsol);
 
-  char *nameofuser[nbofsol];
+  std::vector<char *> nameofuser(nbofsol);
 
   for (int ii = 0; ii < nbofsol; ii++) {
     order[ii] = 0;
@@ -4768,7 +4844,7 @@ AnyType VTK_WriteMesh3_Op::operator( )(Stack stack) const {
   std::string base_filename;
   std::string CellDataArrayForPvtu  = "";
   std::string PointDataArrayForPvtu = "";
-  parallelIO(pffname, nargs[7] ? (MPI_Comm *)GetAny< pcommworld >((*nargs[7])(stack)) : 0,
+  parallelIO(pffname, nargs[7] ? (MPI_Comm *)GetAny< pcommworld >((*nargs[7])(stack)) : nullptr,
              nargs[8] && GetAny< bool >((*nargs[8])(stack)), time, size, base_filename);
 #endif
 
@@ -5046,12 +5122,12 @@ class VTK_WriteMeshT_Op : public E_F0mps {
     long nbfloat;    // 1 scalar, 2 vector (3D), 3 symtensor(3D)
     Expression e[3];
     Expression2( ) {
-      e[0] = 0;
-      e[1] = 0;
-      e[2] = 0;
+      e[0] = nullptr;
+      e[1] = nullptr;
+      e[2] = nullptr;
       what = 0;
       nbfloat = 0;
-    };
+    }
     Expression &operator[](int i) { return e[i]; }
 
     double eval(int i, Stack stack) const {
@@ -5559,9 +5635,9 @@ class VTK_WriteMeshT_Op : public E_F0mps {
 
   vector< Expression2 > l;
 #ifndef COMMON_HPDDM_PARALLEL_IO
-  static const int n_name_param = 8;
+  static const int n_name_param = std::is_same<MMesh, MeshS>::value ? 8 : 7;
 #else
-  static const int n_name_param = 9;
+  static const int n_name_param = std::is_same<MMesh, MeshS>::value ? 9 : 8;
 #endif
   static basicAC_F0::name_and_type name_param[];
   Expression nargs[n_name_param];
@@ -5573,6 +5649,9 @@ class VTK_WriteMeshT_Op : public E_F0mps {
   }
   bool arg(int i, Stack stack, bool a) const {
     return nargs[i] ? GetAny< bool >((*nargs[i])(stack)) : a;
+  }
+  string* arg(int i, Stack stack, string* a) const {
+    return nargs[i] ? GetAny< string* >((*nargs[i])(stack)) : a;
   }
   double arg(int i, Stack stack, double a) const {
     return nargs[i] ? GetAny< double >((*nargs[i])(stack)) : a;
@@ -5987,7 +6066,7 @@ AnyType VTK_WriteMeshT_Op< MMesh >::operator( )(Stack stack) const {
   string *dataname;
   int nbofsol = l.size( );
   KN< int > order(nbofsol);
-  char *nameofuser[nbofsol];
+  std::vector<char *> nameofuser(nbofsol);
 
   for (int ii = 0; ii < nbofsol; ii++) order[ii] = 0;
   if (nargs[0]) {
@@ -6009,7 +6088,7 @@ AnyType VTK_WriteMeshT_Op< MMesh >::operator( )(Stack stack) const {
   std::string base_filename;
   std::string CellDataArrayForPvtu  = "";
   std::string PointDataArrayForPvtu = "";
-  parallelIO(pffname, nargs[7] ? (MPI_Comm *)GetAny< pcommworld >((*nargs[7])(stack)) : 0,
+  parallelIO(pffname, nargs[7] ? (MPI_Comm *)GetAny< pcommworld >((*nargs[7])(stack)) : nullptr,
              nargs[8] && GetAny< bool >((*nargs[8])(stack)), time, size, base_filename);
 #endif
 
@@ -6261,6 +6340,7 @@ class VTK_LoadMeshT_Op : public E_F0mps {
   double arg(int i, Stack stack, double a) const {
     return nargs[i] ? GetAny< double >((*nargs[i])(stack)) : a;
   }
+  string* arg(int i, Stack stack, string* a) const { return nargs[i] ? GetAny< string* >((*nargs[i])(stack)) : a;}
   KN<KN<double> >* arg(int i, Stack stack,KN<KN<double> >*p) const {
     return nargs[i] ? GetAny< KN<KN<double> >* >((*nargs[i])(stack)) : p;
   }
@@ -6282,7 +6362,7 @@ basicAC_F0::name_and_type VTK_LoadMeshT_Op< MeshS >::name_param[] = {
   {"reftri", &typeid(long)},         
   {"swap", &typeid(bool)},
   {"refedge", &typeid(long)},        
-  {"namelabel", &typeid(string)},
+  {"namelabel", &typeid(string*)},
   {"cleanmesh", &typeid(bool)},      
   {"removeduplicate", &typeid(bool)},
   {"precisvertice", &typeid(double)},
@@ -6295,7 +6375,7 @@ basicAC_F0::name_and_type VTK_LoadMeshT_Op< MeshL >::name_param[] = {
   {"refedge", &typeid(long)},        
   {"swap", &typeid(bool)},
   {"refbdpoint", &typeid(long)},     
-  {"namelabel", &typeid(string)},
+  {"namelabel", &typeid(string*)},
   {"cleanmesh", &typeid(bool)},      
   {"removeduplicate", &typeid(bool)},
   {"precisvertice", &typeid(double)},
@@ -6316,7 +6396,7 @@ class VTK_LoadMeshT : public OneOperator {
 
 template< class MMesh >
 MMesh *VTK_LoadT(const string &filename, bool bigEndian, bool cleanmesh, bool removeduplicate,
-                 double precisvertice, double ridgeangledetection, KN<KN<double> >* pfields) {
+                 double precisvertice, double, KN<KN<double> >* pfields) {
   // swap = bigEndian or not bigEndian
   // variable freefem++
   typedef typename MMesh::Element T;
@@ -6333,7 +6413,7 @@ MMesh *VTK_LoadT(const string &filename, bool bigEndian, bool cleanmesh, bool re
     exit(1);
   }
 
-  char buffer[256], buffer2[256], buffer3[256];;
+  char buffer[256], buffer2[256], buffer3[256];
 
   res = fgets(buffer, sizeof(buffer), fp);    // version line
   res = fgets(buffer, sizeof(buffer), fp);    // title
@@ -6796,7 +6876,7 @@ AnyType VTK_LoadMeshT_Op< MMesh >::operator( )(Stack stack) const {
   bool removeduplicate(arg(5, stack, false));
   double precisvertice(arg(6, stack, 1e-6));
   double ridgeangledetection(arg(7, stack, 8.*atan(1.)/9.));
-  KN<KN<double> > * pfields=0;
+  KN<KN<double> > * pfields=nullptr;
   pfields=arg(8, stack,pfields);
   
   MMesh *Th = VTK_LoadT< MMesh >(*pffname, swap, cleanmesh, removeduplicate, precisvertice,ridgeangledetection, pfields);
@@ -6826,17 +6906,17 @@ void saveMatlab(const string &file, const Mesh &Th) {
       pf << "x = [ ";
 
       for (size_t n = 0; n < 3; n++) {
-        pf << std::setprecision(5) << setw(18) << K[n].x << " ";
+        pf << std::setprecision(17) << setw(18) << K[n].x << " ";
       }
 
-      pf << std::setprecision(5) << setw(18) << K[0].x << " ]; ";
+      pf << std::setprecision(17) << setw(18) << K[0].x << " ]; ";
       pf << "y = [ ";
 
       for (size_t n = 0; n < 3; n++) {
-        pf << std::setprecision(5) << setw(18) << K[n].y << " ";
+        pf << std::setprecision(17) << setw(18) << K[n].y << " ";
       }
 
-      pf << std::setprecision(5) << setw(18) << K[0].y << " ]; ";
+      pf << std::setprecision(17) << setw(18) << K[0].y << " ]; ";
       pf << "line(x,y);" << endl;
     }
 
@@ -6873,7 +6953,7 @@ void saveTecplot(const string &file, const Mesh &Th) {
   pf << "ZONE N=" << Th.nv << ", E=" << Th.nt << ", F=FEPOINT, ET=" << shape << endl;
 
   for (int i = 0; i < Th.nv; i++) {
-    pf << std::setprecision(5) << setw(18) << (R2)Th(i) << " \n";
+    pf << std::setprecision(17) << setw(18) << (R2)Th(i) << " \n";
   }
 
   for (int k = 0; k < Th.nt; ++k) {

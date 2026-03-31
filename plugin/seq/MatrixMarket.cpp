@@ -743,7 +743,7 @@ char  *mm_typecode_to_str(MM_typecode matcode)
     else
         return NULL;
 
-    sprintf(buffer,"%s %s %s %s", types[0], types[1], types[2], types[3]);
+    snprintf(buffer, MM_MAX_LINE_LENGTH, "%s %s %s %s", types[0], types[1], types[2], types[3]);
     return mm_strdup(buffer);
 
 }
@@ -759,7 +759,6 @@ long savemtx(std::string *const &hb_filename, Matrice_Creuse< R > *const &sparse
   std::cout << "Savemtx : filename = " << hb_filename->c_str( ) << " " << isDouble <<std::endl;
     const int N = A->N;
     const int M = A->M;
-    if (N != M) return 1;
 
     if(verbosity) std::cout << "SaveMTX : # of unknowns = " << N << std::endl;
 

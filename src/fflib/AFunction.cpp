@@ -139,7 +139,7 @@ template<class T> inline T Max (const T &a,const T & b,const T & c){return Max(M
 template<class T> inline T Min (const T &a,const T & b,const T & c){return Min(Min(a,b),c);}
 template<class T> inline T Min (const T &a,const T & b,const T & c,const T & d){return Min(Min(a,b),Min(c,d));}
 template<class T> inline T Max (const T &a,const T & b,const T & c,const T & d){return Max(Max(a,b),Max(c,d));}
-
+template<class T> inline T Fma (const T &a,const T & b,const T & c){return fma(a,b,c);}
 template<class T> inline T Square (const T &a){return a*a;}
 
 struct SubArray2 {
@@ -594,6 +594,17 @@ public:
     opTrans():   OneOperator(atype<TransE_Array>(),atype<E_Array>()  ) {}
     E_F0 * code(const basicAC_F0 & args) const {
 	  return new TransE_Array(dynamic_cast<const E_Array*>((Expression) args[0])); }
+};
+class opUnary : public OneOperator{
+public:
+    const char * op;
+    AnyType operator()(Stack s)  const {ffassert(0);return 0L;}
+    bool MeshIndependent() const { return false;}
+    
+    opUnary(const char * oop,aType A): OneOperator(atype<C_F0>(),A), op(oop) {}
+
+    E_F0 *  code(const basicAC_F0 & ) const {ffassert(0);}
+    C_F0  code2(const basicAC_F0 &args) const;
 };
 
 class opDot : public OneOperator{
@@ -1422,6 +1433,11 @@ void Init_map_type()
       TheOperators->Add("./",new opSum("/",atype<E_Array >(),atype<TransE_Array>() )   );  // a faire mais dur
     // correct in sept. 2009
       TheOperators->Add("./",new opSum("/",atype<TransE_Array >(),atype<TransE_Array>() )   );  // a faire mais dur
+    // Add sep 2025
+     TheOperators->Add("-",new opUnary("-",atype<E_Array >())   );
+     TheOperators->Add("-",new opUnary("-",atype<TransE_Array >())   );  
+     TheOperators->Add("+",new opUnary("+",atype<E_Array >())   );  //
+     TheOperators->Add("+",new opUnary("+",atype<TransE_Array >())   );
 
 
      // il faut refechir  .....  FH
@@ -1534,7 +1550,6 @@ void Init_map_type()
      TheOperators->Add("[]",new OneOperator_array );
      TheOperators->Add("[border]",new OneOperator_border );
 
-    Global.Add("cos","(",new OneOperator1<double>(cos,2));
     Global.Add("square","(",new OneOperator1<long,long,E_F_F0<long,const long &> >(Square));// add FH Mai 2011
     Global.Add("square","(",new OneOperator1<double,double,E_F_F0<double,const double &> >(Square));
     Global.Add("square","(",new OneOperator1<Complex,Complex,E_F_F0<Complex,const Complex &> >(Square));// add FH Mai 2011
@@ -1553,11 +1568,17 @@ void Init_map_type()
     Global.Add("lround","(",new OneOperator1<long,Complex>(lroundc));  // add aout   2020
 
      Global.Add("sin","(",new OneOperator1<double>(sin,2));
+     Global.Add("cos","(",new OneOperator1<double>(cos,2));
      Global.Add("tan","(",new OneOperator1<double>(tan,2));
+     Global.Add("asin","(",new OneOperator1<double>(asin));
+     Global.Add("acos","(",new OneOperator1<double>(acos));
      Global.Add("atan","(",new OneOperator1<double>(atan,2));
      Global.Add("sinh","(",new OneOperator1<double>(sinh,2));
      Global.Add("cosh","(",new OneOperator1<double>(cosh,2));
      Global.Add("tanh","(",new OneOperator1<double>(tanh,2));
+     Global.Add("asinh","(",new OneOperator1<double>(asinh));
+     Global.Add("acosh","(",new OneOperator1<double>(acosh));
+     Global.Add("atanh","(",new OneOperator1<double>(atanh));
 
     Global.Add("atoi","(",new OneOperator1<long,string*>(atoi));// add march 2010
     Global.Add("atol","(",new OneOperator1<long,string*>(atoi));// add march 2010
@@ -1567,11 +1588,6 @@ void Init_map_type()
     Global.Add("strtol","(",new OneOperator2<long,string*,long>(ffstrtol));// add march 2017
     Global.Add("strtod","(",new OneOperator1<double,string*>(ffstrtod));// add march 2017
 
-     Global.Add("atanh","(",new OneOperator1<double>(atanh));
-     Global.Add("asin","(",new OneOperator1<double>(asin));
-     Global.Add("acos","(",new OneOperator1<double>(acos));
-     Global.Add("asinh","(",new OneOperator1<double>(asinh));
-     Global.Add("acosh","(",new OneOperator1<double>(acosh));
 #ifdef HAVE_ERFC
      Global.Add("erf","(",new OneOperator1<double>(erf));
      Global.Add("erfc","(",new OneOperator1<double>(erfc));
@@ -1590,8 +1606,12 @@ void Init_map_type()
       Global.Add("yn","(",new OneOperator2<double,long,double>(myyn));
 #endif
      Global.Add("exp","(",new OneOperator1<double>(exp));
+     Global.Add("exp2","(",new OneOperator1<double>(exp2));
+     Global.Add("expm1","(",new OneOperator1<double>(expm1));
      Global.Add("log","(",new OneOperator1<double>(log));
      Global.Add("log10","(",new OneOperator1<double>(log10));
+     Global.Add("log1p","(",new OneOperator1<double>(log1p));
+     Global.Add("log2","(",new OneOperator1<double>(log2));
 //     Global.Add("pow","(",new OneOperator2<double,double>(pow));
     Global.Add("pow","(",new OneBinaryOperator<Op2_pow<double,double,double> >);
     Global.Add("pow","(",new OneBinaryOperator<Op2_pow<long,long,long> >);
@@ -1620,6 +1640,7 @@ void Init_map_type()
     Global.Add("atan2","(",new OneOperator2<double>(atan2));
     Global.Add("fmod","(",new OneOperator2<double>(fmod));// add sep 2017
     Global.Add("fdim","(",new OneOperator2<double>(fdim));// add sep 2017
+    Global.Add("fma","(",new OneOperator3_<double, double, double>(Fma));
     Global.Add("fmax","(",new OneOperator2<double>(fmax));// add sep 2017
     Global.Add("fmin","(",new OneOperator2<double>(fmin));// add sep 2017
 
@@ -1627,6 +1648,7 @@ void Init_map_type()
 
      Global.Add("atan","(",new OneOperator2<double>(atan2));
      Global.Add("sqrt","(",new OneOperator1<double>(sqrt,2));
+     Global.Add("cbrt","(",new OneOperator1<double>(cbrt,2));
      Global.Add("abs","(",new OneOperator1<double>(Abs));
      Global.Add("abs","(",new OneOperator1<long>(Abs));
      Global.Add("cos","(",new OneOperator1_<Complex>(cos));
@@ -1925,6 +1947,7 @@ C_F0  opDot::code2(const basicAC_F0 &args) const
     return C_F0();
 
 }
+
 C_F0  opColumn::code2(const basicAC_F0 &args) const
 {
     bool ta =args[0].left()==atype<TransE_Array>();
@@ -2044,11 +2067,72 @@ C_F0  opColumn::code2(const basicAC_F0 &args) const
     else ffassert(0);
     return C_F0();
 }
+C_F0  opUnary::code2(const basicAC_F0 &args) const
+{
+    bool ta =args[0].left()==atype<TransE_Array>();
+    const TransE_Array * tea=0;
+    const E_Array * ea=0;
+    if( ta)  tea = dynamic_cast<const TransE_Array*>((Expression) args[0]);
+    else ea = dynamic_cast<const E_Array*>((Expression) args[0]);
+    assert( ea || tea );
+    const E_Array & a=  ta ? *tea->v : *ea;
+    int na=a.size();
+    if(na <1 && nb < 1) CompileError(" empty array - [ ...]   ");
+    bool maa= a[0].left()==atype<E_Array>();
+    int ma =1;
 
+    if(maa) {
+        ma= a[0].LeftValue()->nbitem();
+        for (int i=1;i<na;i++)
+            if( ma != (int) a[i].LeftValue()->nbitem())
+                CompileError(" first matrix with variable number of columm");
+
+    }
+    int na1=na,ma1=ma;
+    if(ta) RNM::Exchange(na1,ma1);
+
+    KNM<CC_F0> A(na1,ma1) ;
+    if(maa)
+        for (int i=0;i<na;++i)
+        {
+            const E_Array * li=  dynamic_cast<const E_Array *>(a[i].LeftValue());
+            ffassert(li);
+            for (int j=0; j<ma;++j)
+                if(!ta)  A(i,j) = (*li)[j];
+                else     A(j,i) = TryConj((*li)[j]);
+        }
+    else
+        for (int i=0;i<na;++i)
+            if(!ta)  A(i,0) = a[i];
+            else     A(0,i) = TryConj(a[i]);
+
+ 
+    AC_F0  v;
+    v = 0; // empty
+    if( ma1 == 1) // 1 vecteur
+    {
+        for (int i=0;i<na;++i)
+            v += C_F0(TheOperators,op,ta ? TryConj(a[i]) : a[i]) ;
+        return C_F0(TheOperators,"[]",v);
+    }
+    else {
+        // return formal matrix
+        AC_F0  w,v;
+        w=0;
+        for (int i=0;i<na1;++i)
+        {
+            v=0;
+            for (int j=0;j<ma1;++j)
+                v+= C_F0(TheOperators,op,A(i,j));
+            w+=C_F0(TheOperators,"[]",v);
+        }
+        return C_F0(TheOperators,"[]",w);
+    }
+}
 
 C_F0  opSum::code2(const basicAC_F0 &args) const
 {
-
+ 
     bool ta =args[0].left()==atype<TransE_Array>();
     bool tb = args[1].left()==atype<TransE_Array>();
     const TransE_Array * tea=0;
@@ -2136,7 +2220,7 @@ C_F0  opSum::code2(const basicAC_F0 &args) const
         {
             v=0;
             for (int j=0;j<ma1;++j)
-                v+= C_F0(TheOperators,"+",A(i,j),B(i,j));
+                v+= C_F0(TheOperators,op,A(i,j),B(i,j));// correction 3/9/25 FH thanks to O. Pantz
             w+=C_F0(TheOperators,"[]",v);
         }
         return C_F0(TheOperators,"[]",w);

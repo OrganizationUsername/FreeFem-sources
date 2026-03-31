@@ -24,7 +24,7 @@ void output_matrix_entries(ofstream &fout, const int N, const double *const ccs_
                            const int nnzero, const double *const b) {
   for (int i = 0; i < nnzero; i++) {
 
-    fout << setw(20) << setprecision(12) << setiosflags(ios::scientific) << ccs_val[i];
+    fout << setw(20) << setprecision(17) << setiosflags(ios::scientific) << ccs_val[i];
 
     if ((i + 1) % 4 == 0) fout << std::endl;
   }
@@ -32,7 +32,7 @@ void output_matrix_entries(ofstream &fout, const int N, const double *const ccs_
 
   for (int i = 0; i < N; i++) {
 
-    fout << setw(20) << setprecision(12) << setiosflags(ios::scientific) << b[i];
+    fout << setw(20) << setprecision(17) << setiosflags(ios::scientific) << b[i];
 
     if ((i + 1) % 4 == 0) fout << std::endl;
   }
@@ -45,8 +45,8 @@ void output_matrix_entries(ofstream &fout, const int N, const complex< double > 
                            const int nnzero, const complex< double > *const b) {
   for (int i = 0; i < nnzero; i++) {
 
-    fout << setw(20) << setprecision(12) << setiosflags(ios::scientific) << ccs_val[i].real( )
-         << setw(20) << setprecision(12) << setiosflags(ios::scientific) << ccs_val[i].imag( );
+    fout << setw(20) << setprecision(17) << setiosflags(ios::scientific) << ccs_val[i].real( )
+         << setw(20) << setprecision(17) << setiosflags(ios::scientific) << ccs_val[i].imag( );
 
     if ((i + 1) % 2 == 0) fout << std::endl;
   }
@@ -54,8 +54,8 @@ void output_matrix_entries(ofstream &fout, const int N, const complex< double > 
 
   for (int i = 0; i < N; i++) {
 
-    fout << setw(20) << setprecision(12) << setiosflags(ios::scientific) << b[i].real( ) << setw(20)
-         << setprecision(12) << setiosflags(ios::scientific) << b[i].imag( );
+    fout << setw(20) << setprecision(17) << setiosflags(ios::scientific) << b[i].real( ) << setw(20)
+         << setprecision(17) << setiosflags(ios::scientific) << b[i].imag( );
 
     if ((i + 1) % 2 == 0) fout << std::endl;
   }
@@ -140,15 +140,15 @@ long SaveHB(std::string *const &hb_filename, Matrice_Creuse< R > *const &sparse_
 
   // #data lines excluding header
   int totcrd = ptrcrd + indcrd + valcrd + rhscrd;
-  sprintf(buf, "%14d%14d%14d%14d%14d", totcrd, ptrcrd, indcrd, valcrd, rhscrd);
+  snprintf(buf, bufsize, "%14d%14d%14d%14d%14d", totcrd, ptrcrd, indcrd, valcrd, rhscrd);
   fout << buf << std::endl;
 
   // Line 3 : MXTYPE, NROW, NCOL, NNZERO, NELTVL
   const int neltvl = 0;    // #elemental matrix entries, assembled matrix=0
   if (isDouble)
-    sprintf(buf, "RUA           %14d%14d%14d%14d", N, N, nnzero, neltvl);    // double
+    snprintf(buf, bufsize, "RUA           %14d%14d%14d%14d", N, N, nnzero, neltvl);    // double
   else
-    sprintf(buf, "CUA           %14d%14d%14d%14d", N, N, nnzero, neltvl);    // complex<double>
+    snprintf(buf, bufsize, "CUA           %14d%14d%14d%14d", N, N, nnzero, neltvl);    // complex<double>
   fout << buf << std::endl;
 
   // Line 4

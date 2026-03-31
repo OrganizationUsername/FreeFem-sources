@@ -2,7 +2,7 @@
 # test-driver-ff from test-driver - basic testsuite driver script.
 # modif F. Hecht UPMC.
 
-scriptversion=2013-06-27.18; # UTC
+scriptversion=2025-02-21.16; # UTC
 
 # Copyright (C) 2011-2013 Free Software Foundation, Inc.
 #
@@ -118,16 +118,19 @@ if [ "0$FFnp" -gt 0 ] ; then
 else
 	FLAGS_FFPP_B="${FLAGS_FFPP}"
 fi
-export MPIEXEC_TIMEOUT=300
+export MPIEXEC_TIMEOUT=50
 test -z "${COMMONPROGRAMFILES+x}" -a -z "${WINDIR+x}" && ulimit -t 60
 ${TEST_FFPP} ${FLAGS_FFPP_B}  "$@" ${FLAGS_FFPP_A}>$log_file 2>&1
 estatus=$?
-FAIL_CPU_LIMIT=`tail -100 $log_file|egrep -i 'Cputime limit exceeded|MPIEXEC_TIMEOUT|Timeout after'|wc -l`
+echo "status " $estatus >>$log_file 
+FAIL_CPU_LIMIT=`tail -100 $log_file|egrep -i 'Cputime limit exceeded|MPIEXEC_TIMEOUT|APPLICATION TIMED OUT|Timeout after'|wc -l`
 fi
-
+# Catch ulimit timeout on Linux
+if [ $estatus -eq 137 ]; then
+  FAIL_CPU_LIMIT=2
+fi
 ## Add an error suffix in order to extract errored tests only
-if [ $estatus -ne 0 ] && [ $estatus -ne 77 ]
-then
+if [ $estatus -ne 0 ] && [ $estatus -ne 77 ]; then
   cp $log_file "${log_file}.err"
 fi
 

@@ -44,7 +44,7 @@ extern YYSTYPE *plglval;
 //  and more  simple
 // FH Jan. 2005
 
-static const bool debugmacro = false;
+static  bool debugmacro = false;
 
 int  setMarkdown(const char * fn)
   {
@@ -212,7 +212,7 @@ int mylex::EatCommentAndSpace(string *data)
     };
     auto  GetLine = [&](string nnn) {
         // begin of line !!!
-        getline(source(),nnn);
+        getline(source(),nnn,'\n');
         LineNumber();
         
     };
@@ -244,7 +244,7 @@ int mylex::EatCommentAndSpace(string *data)
                 int c1=source().get();
                 int c2=source().get();
                 if( c1==mark && c2==mark) {
-                    getline(source(),nnn); // get end of line
+                    getline(source(),nnn,'\n'); // get end of line
                     if(data) *data += mark3+nnn;
                     if (echomd) cout << mark3<< nnn  ;
                     linenumber++;
@@ -261,12 +261,13 @@ int mylex::EatCommentAndSpace(string *data)
     do  // loop on type of comment !!
     {
        // cout << "incomment"<< incomment << " "<< int(c) << " " << c << endl;
-        ffassert(count++<100);
+        ffassert(count++<10000);
         eatspaces();
         // eat markdown <CR>~~~ or comment
-        if(ifblock('~')==1 ||ifblock('`')==1 ) {
+        if(incomment==1 && (ifblock('~')==1 ||ifblock('`')==1 )) {
             LineNumber();// eat CR ???
             incomment=3;// in markdown
+            cnl=1; // starting line !!
         }
         if(incomment==1)
         {// normal case
@@ -276,7 +277,7 @@ int mylex::EatCommentAndSpace(string *data)
                 caux=source().peek();
                 if(caux =='/') {// ex:
                     source().get();
-                    getline(source(),nnn); // eat \n
+                    getline(source(),nnn,'\n'); // eat \n
                     if (echo) cout << "//"<< nnn  ;
                     if(data) *data+="//"+nnn;
                     source().putback('\n');
@@ -324,7 +325,7 @@ int mylex::EatCommentAndSpace(string *data)
             sep=space;
             do
             {
-                getline(source(),nnn);//  get line
+                getline(source(),nnn,'\n');//  get line
                 if(echomd) cout << linenumber << " ::: " << nnn << endl;
                 linenumber++;
                 if(data) *data+=nnn+'\n';
@@ -332,6 +333,7 @@ int mylex::EatCommentAndSpace(string *data)
                 if (nnn.find("~~~freefem")==0 ||nnn.find("```freefem")==0) // we find => end MD
                     end = 1;
                //  cr eat by getline
+                cnl=1; // starting line !!
             }
             while(!source().eof()  && end == 0 ) ;
             if (echo) cout << "\n" << setw(5) <<linenumber << this->sep() ;
@@ -386,19 +388,17 @@ debut:
         int i=1;
         buf[0]=c;
         bool real= (c=='.');
-
-
-        while ( isdigit(nc) && i< 50 ) buf[i++]=source().get(),nc=source().peek();
+        while ( isdigit(nc) && i < 1024 ) buf[i++]=source().get(),nc=source().peek();
         if (!real && (nc == '.')) real=true,buf[i++]=source().get(),nc=source().peek();
-        while ( isdigit(nc) && i< 50 ) buf[i++]=source().get(),nc=source().peek();
+        while ( isdigit(nc) && i < 1024 ) buf[i++]=source().get(),nc=source().peek();
         if (nc =='E' || nc =='e' || nc =='D' || nc =='d')
         {
             real=true;
             buf[i++]=source().get(),nc=source().peek();
             if (nc =='+' || nc =='-' || isdigit(nc))  buf[i++]=source().get(),nc=source().peek();
-            while ( isdigit(nc) && i< 50 ) buf[i++]=source().get(),nc=source().peek();
+            while ( isdigit(nc) && i < 1024 ) buf[i++]=source().get(),nc=source().peek();
         }
-        if (i>= 50) erreur("Number too long");
+        if (i>= 1024) erreur("Number too long");
 
         buf[i]=0;
         if (nc=='i' )
@@ -418,10 +418,9 @@ debut:
     {
         ret =  ID;
         int i;
-        for (i = 1; i < 256 && isalnum(source().peek()); i++)
+        for (i = 1; i < 1024 && isalnum(source().peek()); i++)
             buf[i]=source().get();
-        if (i == 256)
-            erreur ("Identifier too long");
+        if (i == 1024) erreur ("Identifier too long");
         buf[i] = 0;
     }
 
@@ -431,7 +430,7 @@ debut:
         int i;
         char cc,ccc;
         for (     i = 0,cc=source().peek();
-                  i < 256 &&  ( (isprint(cc)|isspace(cc)) && cc !='\n'  && cc !='"');
+                  i < 1024 &&  ( (isprint(cc)|isspace(cc)) && cc !='\n'  && cc !='"');
                   cc=source().peek(),++i
             )
         {
@@ -470,7 +469,7 @@ debut:
             else
                 buf[i] = source().get();
         }
-        if (i == 256) erreur ("String too long");
+        if (i == 1024) erreur ("String too long");
         buf[i] = 0;
         if(source().get() != '"') erreur("End of String could not be found");
         plglval->str = newcopy(buf);
@@ -716,7 +715,21 @@ bool mylex::SetMacro(int &ret)
 
     bool rt=false;
     int oldmacro=1;
-    if (strncmp(buf,"macro",6)==0 || (oldmacro=strncmp(buf,newmacro,9))==0 )
+    if(strncmp(buf,"debugmacro",10)==0 )
+    {
+        debugmacro = true;
+        rt=true;
+        ret= basescan();
+        
+    }
+    else if(strncmp(buf,"nodebugmacro",12)==0 )
+    {
+        debugmacro = false;
+        rt=true;
+        ret= basescan();
+        
+    }
+    else if (strncmp(buf,"macro",6)==0 || (oldmacro=strncmp(buf,newmacro,9))==0 )
     {
         if(echo)  print(cout);
         char *macroname=newcopy(match(ID));
@@ -822,7 +835,7 @@ bool mylex::SetMacro(int &ret)
         }
         while(1);
         macroparm.d.push_back(def);
-        if(verbosity>999) cout <<" macro : " << macroname<< ", def =  :"<< def << endl;
+        if(verbosity>999|| debugmacro) cout <<" macro : " << macroname<< ", def =  :"<< def << endl;
         if (nbparam)
             if(echo) cout << " )  " ;
         MapMacroDef & MacroDef =listMacroDef->back();
@@ -871,6 +884,8 @@ bool mylex::IFMacroId(bool isnot,string & id,bool withval ,string &val)
             
         }
     }
+    if(debugmacro)  cout << " check IFMACRO '"<< id << "' exist "<< exist << " isnot "
+                         << isnot   <<endl;
     return exist == (isnot==0);
 }
 bool mylex::IFMacroArgs(int lvl)

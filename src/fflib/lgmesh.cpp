@@ -550,7 +550,7 @@ AnyType Op_trunc_mesh::Op::operator()(Stack stack)  const {
 
      *mp=mps;
      if (verbosity>1)
-     cout << "  -- Trunc mesh: Nb of Triangle = " << kk << " label=" <<label <<endl;
+     cout << "  -- Trunc mesh(2d): Nb of Triangle = " << kk << " label=" <<label <<endl;
     Mesh  * pmsh = new Mesh(Th,split,false,label);
     if(renum)
         pmsh->renum();
@@ -653,7 +653,7 @@ AnyType SaveMesh::operator()(Stack stack) const
     MeshPoint *mp(MeshPointStack(stack)) , mps=*mp;
      ofstream fp((*fn+".points").c_str());
      ofstream ff((*fn+".faces").c_str());
-     fp.precision(12);
+     fp.precision(17);
      if (verbosity>1)
        cout << "  -- Opening files " << (*fn+".points") << " and " << (*fn+".faces") << endl;
     const   Fem2D::Mesh & Th=*Thh;
@@ -925,30 +925,6 @@ AnyType Adaptation::operator()(Stack stack) const
   Th.SmoothMetric(raison);
   Th.MaxSubDivision(maxsubdiv);
   Th.BoundAnisotropy(anisomax);
-   if(nbcperiodic && false ) // in test
-       // to be sure that the metric is ok with periotic BC
-   {  // bof Bof ...
-       if(verbosity>1) cout << "  inforce de periodic BC on Metric" << endl;
-       KN<double> m(3*ndfv.N()), c(ndfv.N());
-       c=0.;
-       m=0.;
-      for ( iv=0;iv<Th.nbv;iv++)
-       {
-           int jv = ndfv[iv];
-           c[jv] += 1.;
-           m[jv*3  ] += Th[iv].m.a11;
-           m[jv*3+1] += Th[iv].m.a22;
-           m[jv*3+2] += Th[iv].m.a21;
-       }
-       for ( iv=0;iv<Th.nbv;iv++)
-       {
-           int jv = ndfv[iv];
-           Th[iv].m.a11 = m[jv*3  ] /c[jv]  ;
-           Th[iv].m.a22 = m[jv*3+1] /c[jv];
-           Th[iv].m.a21 = m[jv*3+2] /c[jv];
-
-       }
-   }
   // end of metric's computation
    if (mtx)
     for ( iv=0;iv<Th.nbv;iv++)
@@ -1624,6 +1600,45 @@ bool AddLayers(Mesh const * const & pTh, KN<double> * const & psupp, long const 
     return true;
 }
 
+bool AddLayersVh(pfes const & pVh, KN<double> * const & psupp, long const & nlayer,KN<double> * const & pphi)
+{
+    ffassert(pVh && psupp && pphi);
+    typedef typename v_fes::FESpace FESpace;
+    const FESpace & Uh = **pVh;
+    const int n = Uh.NbOfDF;
+    const int nve = Uh.MaxNbNodePerElement;
+    const Mesh & Th= Uh.Th;
+    const int nt = Th.nt;
+
+    KN<double> & supp(*psupp);
+    KN<double> u(n), s(nt);
+    KN<double> & phi(*pphi);
+    ffassert(supp.N()==nt); // P0
+    ffassert(phi.N()==n); // P1
+    s = supp;
+    phi=0.;
+
+    for(int step=0; step < nlayer; ++ step)
+    {
+        u = 0.;
+        for(int k=0; k<nt; ++k)
+            if(s[k] > 0.0)
+                for(int i=0; i<nve; ++i)
+                    u[Uh(k,i)] = 1.0;
+
+        phi += u;
+
+        s = 0.;
+        for(int k=0; k<nt; ++k)
+            for(int i=0; i<nve; ++i)
+                if(u[Uh(k,i)] > 0.0)
+                    s[k] = 1.0;
+
+        supp += s;
+    }
+    if (nlayer > 1) phi *= (1./nlayer);
+    return true;
+}
 
 double arealevelset(Mesh const * const & pTh,KN<double>  * const & pphi,const double & phi0,KN<double>  * const & where)
 {
@@ -2000,6 +2015,7 @@ void init_lgmesh() {
 		    new OneOperator2_<pmesh*,pmesh*,string* >(&initMesh));
     // Thg,suppi[],nnn,unssd[]
   Global.Add("AddLayers","(",new OneOperator4_<bool,const Mesh * , KN<double> * , long ,KN<double> * >(AddLayers));
+  Global.Add("AddLayers","(",new OneOperator4_<bool, pfes, KN<double> * , long ,KN<double> * >(AddLayersVh));
   Global.Add("SameMesh","(",new OneOperator2_<bool,const Mesh * ,const  Mesh * >(SameMesh));
   // use for :   mesh Th = readmesh ( ...);
     //  Add FH mars 2015 to compute mesure under levelset ...

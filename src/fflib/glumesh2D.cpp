@@ -483,7 +483,6 @@ AnyType Op_GluMeshtab::Op::operator () (Stack stack)  const {
      Tht = GluMeshtab(tab, labtodel,eps);
     else
      Tht=GluMesh(*lth,labtodel,eps);
-    ffassert(Tht);
     Add2StackOfPtr2FreeRC(stack, Tht);
     return Tht;
 }

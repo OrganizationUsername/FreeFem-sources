@@ -2,7 +2,19 @@
 #define _COMMON_HPDDM_
 
 #include <math.h>
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
 #include <mpi.h>
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic pop
+#endif
 #include <ff++.hpp>
 #include <AFunction_ext.hpp>
 #include <array_tlp.hpp>
@@ -10,10 +22,33 @@
 #define GENERATE_DEPRECATED_FUNCTIONS
 
 #if defined(WITH_bemtool) && defined(PETSC_HAVE_HTOOL)
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wunused-parameter"
+  #pragma clang diagnostic ignored "-Wextra-semi"
+  #pragma clang diagnostic ignored "-Wextra-semi-stmt"
+  #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+  #pragma clang diagnostic ignored "-Wvla-cxx-extension"
+  #pragma clang diagnostic ignored "-Wundef"
+  #pragma clang diagnostic ignored "-Wdouble-promotion"
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wunused-parameter"
+  #pragma GCC diagnostic ignored "-Wextra-semi"
+  #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+  #pragma GCC diagnostic ignored "-Wvla"
+  #pragma GCC diagnostic ignored "-Wundef"
+  #pragma GCC diagnostic ignored "-Wdouble-promotion"
+#endif
 #include <bemtool/tools.hpp>
 #include <bemtool/fem/dof.hpp>
 #include <bemtool/operator/operator.hpp>
 #include <bemtool/miscellaneous/htool_wrap.hpp>
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic pop
+#endif
 #include "common_bem.hpp"
 #endif
 
@@ -24,7 +59,7 @@
 #include <mkl.h>
 #endif
 
-#if HPDDM_SCHWARZ || HPDDM_FETI || HPDDM_BDD
+#if defined(HPDDM_SCHWARZ) && (HPDDM_SCHWARZ || HPDDM_FETI || HPDDM_BDD)
 #ifdef WITH_mkl
 #define MKL_PARDISOSUB
 #elif defined(WITH_mumps)
@@ -40,7 +75,7 @@
 #undef HPDDM_INEXACT_COARSE_OPERATOR
 #define HPDDM_INEXACT_COARSE_OPERATOR 0
 #endif
-#if HPDDM_PRECISION == 2
+#if defined(HPDDM_PRECISION) && HPDDM_PRECISION == 2
 #if defined(WITH_slepc) || defined(WITH_slepccomplex)
 #define MU_SLEPC
 #elif defined(HAVE_LIBARPACK)
@@ -54,7 +89,7 @@
 
 #include <HPDDM.hpp>
 
-#ifdef HPDDM_HPP_
+#if !defined(_HPDDM_)
 #define HPDDM_n n_
 #define HPDDM_m m_
 #define HPDDM_sym sym_
@@ -66,9 +101,6 @@
 #define HPDDM_dof dof_
 #define HPDDM_numbering numbering_
 #else
-#ifndef _HPDDM_
-#error "This should never happen"
-#endif
 #define HPDDM_n _n
 #define HPDDM_m _m
 #define HPDDM_sym _sym
@@ -131,7 +163,7 @@ HPDDM::MatrixCSR<K> * new_HPDDM_MatrixCSR(MatriceMorse<upscaled_type<K>>* mA, bo
         return nullptr;
 }
 template<class K>
-HPDDM::MatrixCSR<void> * new_HPDDM_MatrixCSRvoid(MatriceMorse<K   >* mA,bool mfree=false,int *is=0,int *js=0)
+HPDDM::MatrixCSR<void> * new_HPDDM_MatrixCSRvoid(MatriceMorse<K   >* mA,bool mfree=false,int *is=nullptr,int *js=nullptr)
 { if(mA)
 {
     mA->CSR();
@@ -140,7 +172,7 @@ HPDDM::MatrixCSR<void> * new_HPDDM_MatrixCSRvoid(MatriceMorse<K   >* mA,bool mfr
     return new HPDDM::MatrixCSR<void>(mA->n, mA->m, mA->nnz, is, js , mA->half > 0,mfree);
 }
 else
-    return 0;
+    return nullptr;
 }
 
 template<class K>
@@ -149,9 +181,9 @@ void set_ff_matrix(MatriceMorse<upscaled_type<K>>* mA,const HPDDM::MatrixCSR<K> 
     //void HashMatrix<I,R>::set(I nn,I mm,int hhalf,size_t nnnz, I *ii, I*jj, R *aa,,int f77,int tcsr)
     if(verbosity>99) cout << " set_ff_matrix " <<endl;
     // Warning this pointeur a change or not in hpddm => not del in HashMatrix
-    mA->j=0;
-    mA->p=0;
-    mA->aij=0;
+    mA->j=nullptr;
+    mA->p=nullptr;
+    mA->aij=nullptr;
     
     mA->set(dA.HPDDM_n,dA.HPDDM_m,dA.HPDDM_sym,dA.HPDDM_nnz,dA.HPDDM_ia,dA.HPDDM_ja,reinterpret_cast<upscaled_type<K>*>(dA.HPDDM_a),0,1);
 }
@@ -167,7 +199,7 @@ class STL {
     T* const _it;
     const int _size;
     public:
-        STL(const KN<T>& v) : _it(v), _size(v.size()) { };
+        STL(const KN<T>& v) : _it(v), _size(v.size()) { }
         int size() const {
             return _size;
         }
@@ -186,7 +218,7 @@ class STL {
 template<class K>
 class Pair {
     public:
-        Pair() : p() { };
+        Pair() : p() { }
         std::pair<MPI_Request, const K*>* p;
         void init() { }
         void destroy() {
@@ -200,7 +232,7 @@ template<class A> inline AnyType DeleteDTOR(Stack, const AnyType& x) {
     a->dtor();
     a = NULL;
     return Nothing;
-};
+}
 
 extern KN<String>* pkarg;
 
@@ -212,7 +244,7 @@ void exchange(Type* const& pA, K* pin, unsigned short mu, bool allocate) {
         pA->template exchange<false>(pin, mu);
 }
 template<class Type, class K, typename std::enable_if<HPDDM::hpddm_method_id<Type>::value != 1>::type* = nullptr>
-void exchange(Type* const& pA, K* pin, unsigned short mu, bool allocate) { }
+void exchange(Type* const&, K*, unsigned short, bool) { }
 template<class U, class Type, class K>
 void exchange_dispatched(Type* const& pA, KN<K>* pin, bool scaled) {
     if(pA) {
@@ -428,37 +460,94 @@ void addScalarProduct() {
     atype<Op*>()->Add("(", "", new OneOperator3_<K, Op*, KN<K>*, KN<K>*>(scalarProduct<Op, K>));
 }
 
-template<class A>
-inline AnyType MyDestroyKN(Stack, const AnyType& x) {
-    KN<A>* a = GetAny<KN<A>*>(x);
-    for(int i = 0; i < a->N(); ++i)
-        (*a)[i].dtor();
-    a->destroy();
-    return Nothing;
-}
-template<class R>
-R* InitKN(R* const& a, const long& n) {
-    a->init(n);
-    return a;
-}
 template<class T>
-T* resizeClean(const Resize<T>& t, const long &n) {
-    int m = t.v->N();
-    for(int i = n; i < m; ++i)
-        (*t.v)[i].dtor();
-    t.v->resize(n);
+T* resizeClean(const Resize<T>& t, const long &m) {
+    long M = t.v->N();
+    if(M != m) {
+      M = std::min(M, m);
+      typename T::K* array = new typename T::K[M]();
+      for(long j = 0; j < M; ++j) {
+#if defined(WITH_petsc) || defined(WITH_petsccomplex)
+          if((*t.v)[j]._petsc) {
+#endif
+            array[j] = (*t.v)[j];
+            (*t.v)[j] = typename T::K();
+#if defined(WITH_petsc) || defined(WITH_petsccomplex)
+          }
+#endif
+      }
+      t.v->resize(m);
+      for(long j = 0; j < M; ++j) {
+#if defined(WITH_petsc) || defined(WITH_petsccomplex)
+          if(array[j]._petsc) {
+#endif
+            (*t.v)[j] = array[j];
+            array[j] = typename T::K();
+#if defined(WITH_petsc) || defined(WITH_petsccomplex)
+          }
+#endif
+      }
+      delete [] array;
+    }
+    return t.v;
+}
+
+template<class T>
+T* resizeClean(const Resize<T>& t, const long &n, const long &m) {
+    long N = t.v->N();
+    long M = t.v->M();
+    if (N != n || M != m) {
+      N = std::min(N, n);
+      M = std::min(M, m);
+      typename T::K* array = new typename T::K[N * M]();
+      for(long i = 0; i < N; ++i)
+        for(long j = 0; j < M; ++j) {
+#if defined(WITH_petsc) || defined(WITH_petsccomplex)
+          if((*t.v)(i, j)._petsc) {
+#endif
+            array[i * M + j] = (*t.v)(i, j);
+            (*t.v)(i, j) = typename T::K();
+#if defined(WITH_petsc) || defined(WITH_petsccomplex)
+          }
+#endif
+        }
+      t.v->resize(n, m);
+      for(long i = 0; i < N; ++i)
+        for(long j = 0; j < M; ++j) {
+#if defined(WITH_petsc) || defined(WITH_petsccomplex)
+          if(array[i * M + j]._petsc) {
+#endif
+            (*t.v)(i, j) = array[i * M + j];
+            array[i * M + j] = typename T::K();
+#if defined(WITH_petsc) || defined(WITH_petsccomplex)
+          }
+#endif
+        }
+      delete [] array;
+    }
     return t.v;
 }
 
 template<class Op>
 void addArray() {
-    Dcl_Type<KN<Op>*>(0, MyDestroyKN<Op>);
-    TheOperators->Add("<-", new OneOperator2_<KN<Op>*, KN<Op>*, long>(&InitKN));
+    Dcl_Type<KN<Op>*>(InitP<KN<Op>>, Destroy<KN<Op>>);
+    TheOperators->Add("<-", new OneOperator2_<KN<Op>*, KN<Op>*, long>(&set_init));
     atype<KN<Op>*>()->Add("[", "", new OneOperator2_<Op*, KN<Op>*, long>(get_elementp_<Op, KN<Op>*, long>));
     Dcl_Type<Resize<KN<Op>>>();
     Add<KN<Op>*>("resize", ".", new OneOperator1<Resize<KN<Op>>, KN<Op>*>(to_Resize));
     Add<Resize<KN<Op>>>("(", "", new OneOperator2_<KN<Op>*, Resize<KN<Op>>, long>(resizeClean));
     map_type_of_map[make_pair(atype<long>(), atype<Op*>())] = atype<KN<Op>*>();
+    Add<KN<Op>*>("n", ".", new OneOperator1<long, KN<Op>*>(get_n));
+
+    Dcl_Type<KNM<Op>*>(InitP<KNM<Op>>, Destroy<KN<Op>>);
+    TheOperators->Add("<-", new OneOperator3_<KNM<Op>*, KNM<Op>*, long, long>(&set_init2));
+    atype<KNM<Op>*>()->Add("(", "", new OneOperator3_<Op*, KNM<Op>*, long, long>(get_elementp2_<Op, KNM<Op>*, long, long>));
+    Dcl_Type<Resize<KNM<Op>>>();
+    Add<KNM<Op>*>("resize", ".", new OneOperator1<Resize<KNM<Op>>, KNM<Op>*>(to_Resize));
+    Add<Resize<KNM<Op>>>("(", "", new OneOperator3_<KNM<Op>*, Resize<KNM<Op>>, long, long>(resizeClean));
+    map_type_of_map[make_pair(atype<pair<long, long>>(), atype<Op*>())] = atype<KNM<Op>*>();
+    Add<KNM<Op>*>("n", ".", new OneOperator1<long, KNM<Op>*>(get_n));
+    Add<KNM<Op>*>("m", ".", new OneOperator1<long, KNM<Op>*>(get_m));
 }
 
 void parallelIO(string*& name, MPI_Comm* const& comm, bool const& append, int& T, int& size, std::string& base_filename) {
@@ -537,7 +626,19 @@ long periodicity(Matrice_Creuse<double>* const& R, KN< KN< long > >* const& inte
 }
 
 #define COMMON_HPDDM_PARALLEL_IO
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wdouble-promotion"
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wdouble-promotion"
+#endif
 #include "../seq/iovtk.cpp"
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+  #pragma GCC diagnostic pop
+#endif
 
 #if defined(PETSCSUB) || HPDDM_PETSC
 namespace PETSc {
@@ -599,7 +700,7 @@ static void Init_Common() {
         Global.Add("kron", "(", new OneOperator2s_<newpMatrice_Creuse<double>, Matrice_Creuse<double>*, Matrice_Creuse<double>*>(kron));
         Global.Add("kron", "(", new OneOperator2s_<newpMatrice_Creuse<std::complex<double>>, Matrice_Creuse<std::complex<double>>*, Matrice_Creuse<std::complex<double>>*>(kron));
     }
-#if HPDDM_SCHWARZ || HPDDM_FETI || HPDDM_BDD
+#if defined(HPDDM_SCHWARZ) && (HPDDM_SCHWARZ || HPDDM_FETI || HPDDM_BDD)
     aType t;
     int r;
     if(!zzzfff->InMotClef("pair", t, r)) {

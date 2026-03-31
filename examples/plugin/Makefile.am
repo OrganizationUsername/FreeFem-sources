@@ -274,9 +274,8 @@ freefem++.pref: Makefile
 	echo loadpath = "../../plugin/seq/" > freefem++.pref
 	echo includepath = "../../idp/" >> freefem++.pref
 
-clean-local::
-	-rm -r include
-	-rm include.done
+clean-local:
+	-rm -r include include.done *.pdf *.mesh* *.ppm *.vtk *.hb *.vtu *.data *.dt *.ps *.dx
 
 Ref: makeref.edp
 	../../src/nw/FreeFem++-nw makeref.edp
@@ -303,5 +302,3 @@ skip:
 # To check the scripts against their reference values
 regtests.edp: regtests.m4 ../../etc/config/m4/regtests.m4
 	m4 -DASSERT regtests.m4 > regtests.edp
-
-clean-local::

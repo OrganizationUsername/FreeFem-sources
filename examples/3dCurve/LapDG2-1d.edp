@@ -1,0 +1,79 @@
+//    Discontinous Galerlin Method in 1d 
+//   based on paper from 
+// Riviere, Beatrice; Wheeler, Mary F.; Girault, Vivette
+// title: 
+// A priori error estimates for finite element 
+// methods based on discontinuous approximation spaces
+//  for elliptic problems.
+//  SIAM J. Numer. Anal. 39 (2001), no. 3, 902--931 (electronic).
+//  ---------------------------------
+//  Formulation given by Vivette Girault
+//  ------ 
+// Author: F. Hecht , december 2003
+// -------------------------------
+//   nonsymetric bilinear form
+//   ------------------------
+//  solve $ -\Delta u = f$ on $\Omega$ and $u= g$ on $\Gamma$
+//  on intalledges :
+// the edge are see nTonEdge times so we / nTonEdge
+// remark: nTonEdge =1 on border edge and =2 on internal 
+// we are in a triangle normal is the exterior normal
+// def: jump = external - internal value,     on border extern  - internal value
+//      mean = (external + internal value)/2, on border just mean internal value
+
+macro dn(u) (N.x*dx(u) ) //  def the normal derivative 
+int nn=100;
+meshL Th = segment(nn); // unite seg 
+meshL Th2 = segment(nn*2);// for the graphique
+fespace Vh(Th,P2dcL);     // Discontinous P2 finite element
+fespace Xh(Th,P1);
+fespace Ph(Th,P0);
+Vh XX=x,YY=x*(1-x);
+
+cout << XX[] << endl;
+plot([XX[],YY[]],wait=1,cmm="XX "+XX[].linfty);
+
+fespace Wh(Th2,P1);
+//  if pena = 0 => Vh must be P2 otherwise we need some penalisation  
+real pena=1; // a paramater to add penalisation 
+
+func f= 1;
+func g=0;
+Vh u,v;
+Xh uu,vv;
+verbosity=9;
+// intallBE
+
+varf aa(u,v) =  intallBE(Th)(jump(u)*jump(v)*N.x);
+matrix AA=aa(Vh,Vh);
+
+//cout << AA << endl;
+
+solve A(u,v,solver=sparsesolver) = 
+   int1d(Th)(dx(u)*dx(v)  )
+ + intallBE(Th)(//  loop on all  edge of all triangle 
+          ( jump(v)*mean(dn(u)) -  jump(u)*mean(dn(v)) 
+            + pena*jump(u)*jump(v) ) / nElementonB
+
+          ) 
+- int1d(Th)(f*v) 
+- int0d(Th)(g*dn(v)  + pena*g*v) 
+;
+
+solve A1(uu,vv,solver=CG) 
+= 
+ int1d(Th)(dx(uu)*dx(vv)) - int1d(Th)(f*vv) + on(1,2,uu=g);
+ 
+Wh X=x;
+Wh UU=uu;
+Wh U=u;
+plot([X[],UU[]],wait=1,cmm="UU "+UU[].linfty);
+plot([X[],U[]],wait=1,cmm="U "+U[].linfty);
+plot(u,uu,cmm="Continuous and Discontinue Galerkin",wait=1,value=1);
+plot(u,cmm="Discontinue Galerkin",wait=1,value=1,fill=1);
+Vh eh= u-uu;
+real err =eh[].linfty/uu[].linfty; 
+cout << " ||err|| relative: " << err << " " <<uu[].linfty  <<  endl;
+
+assert( err < 1e-1);
+

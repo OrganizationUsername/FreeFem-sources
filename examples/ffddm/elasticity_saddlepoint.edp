@@ -119,8 +119,6 @@ ENDIFMACRO
    with overlap size 2*2 (prefix MAug) */
 ffddmbuildDmeshAug(M,ThGlobal,mpiCommWorld)
 
-func Pk = [Pku,Pkp];
-
 /* build Dfespace for A on distributed mesh M (prefix AFE) ; this also builds Dfespace tilde with larger overlap
    on distributed mesh MAug (prefix AFEAug) needed for the rectangular operator B on tilde decomposition.
    This also builds 'AFEAuginterp' matrices (restriction matrices from AFEAugVhi to AFEVhi local FE spaces). */

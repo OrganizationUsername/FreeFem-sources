@@ -5,6 +5,10 @@
     ux,uy the x,y movevement (P1 fespace on Th)
     nstep : max number of laplacien smoothing
 */
+/*
+  This code do not work so I Remove FH 17 nov 2025 
+
+
 func mesh movemeshsmooth(mesh & Th,int[int] &lab,real[int] &ux,real[int] &uy,int nstep)
 {
 fespace WWWWWh(Th,P1); 
@@ -48,6 +52,7 @@ for(step= 0; step < nstep; ++ step)
 }
 return movemesh(Th,[u,v]);
 }
+*/
 /*
 // For test ... 
 //  smothing before move mesh
