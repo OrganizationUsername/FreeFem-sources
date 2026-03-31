@@ -3,7 +3,7 @@
 ## [Version number]
 ### Added
 
-- Add formal unary operator in formal array  ; -[1] is now [-1]  3/Sep/25
+-
 
 ### Changed
 -
@@ -23,6 +23,25 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+
+### Added
+
+-
+
+### Changed
+-
+
+### Deprecated
+-
+
+### Removed
+-
+
+### Fixed
+-
+
+## [4.16]
+
 ### Added
  Add support for ChangeNumbering with array of Mat and KNM
  Add example of error indicator mesh adaptation in 3d see  examples/3d/adaptindicator3dP1.md
@@ -907,7 +926,8 @@ All notable changes to this project will be documented in this file.
 
 - The main distribution is now on Github
 
-[Unreleased]: https://github.com/FreeFem/FreeFem-sources/compare/v4.15..develop
+[Unreleased]: https://github.com/FreeFem/FreeFem-sources/compare/v4.16..develop
+[4.16]: https://github.com/FreeFem/FreeFem-sources/compare/v4.15..v4.16
 [4.15]: https://github.com/FreeFem/FreeFem-sources/compare/v4.14..v4.15
 [4.14]: https://github.com/FreeFem/FreeFem-sources/compare/v4.13..v4.14
 [4.13]: https://github.com/FreeFem/FreeFem-sources/compare/v4.12..v4.13
